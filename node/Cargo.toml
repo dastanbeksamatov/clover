@@ -82,7 +82,4 @@ substrate-build-script-utils = { workspace = true }
 [features]
 default = [ "cli" ]
 
-cli = [
-    "sc-cli",
-    "structopt",
-]
+cli = [ "sc-cli", "structopt" ]
