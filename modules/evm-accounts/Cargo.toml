@@ -26,16 +26,16 @@ clover-traits = { workspace = true }
 pallet-balances = { workspace = true }
 
 [features]
-default = ["std"]
+default = [ "std" ]
 std = [
-	"parity-scale-codec/std",
-	"libsecp256k1/std",
-	"sp-core/std",
-	"sp-runtime/std",
-	"sp-io/std",
-	"sp-std/std",
+	"fp-evm/std",
 	"frame-support/std",
 	"frame-system/std",
-	"fp-evm/std",
+	"libsecp256k1/std",
 	"pallet-evm/std",
+	"parity-scale-codec/std",
+	"sp-core/std",
+	"sp-io/std",
+	"sp-runtime/std",
+	"sp-std/std",
 ]

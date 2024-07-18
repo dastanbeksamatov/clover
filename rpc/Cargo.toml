@@ -28,10 +28,10 @@ strum_macros = { workspace = true }
 int-enum = { workspace = true }
 
 [features]
-default = ["std"]
+default = [ "std" ]
 std = [
-  "serde",
-  "clover-rpc-runtime-api/std",
-  "sp-api/std",
-  "parity-scale-codec/std",
+	"clover-rpc-runtime-api/std",
+	"parity-scale-codec/std",
+	"serde",
+	"sp-api/std",
 ]

@@ -31,16 +31,16 @@ sp-core = { workspace = true }
 sp-io = { workspace = true }
 
 [features]
-default = ['std']
+default = [ 'std' ]
 std = [
-  'byteorder/std',
-  'frame-support/std',
-  'frame-system/std',
-  'num-traits/std',
-  'orml-utilities/std',
-  'pallet-balances/std',
-  'clover-primitives/std',
-  'serde',
-  'sp-runtime/std',
-  'sp-std/std',
+	'byteorder/std',
+	'clover-primitives/std',
+	'frame-support/std',
+	'frame-system/std',
+	'num-traits/std',
+	'orml-utilities/std',
+	'pallet-balances/std',
+	'serde',
+	'sp-runtime/std',
+	'sp-std/std',
 ]
