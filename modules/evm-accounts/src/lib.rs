@@ -20,7 +20,6 @@ use sp_core::{crypto::AccountId32, ecdsa, H160};
 use sp_io::{crypto::secp256k1_ecdsa_recover, hashing::keccak_256};
 use sp_std::marker::PhantomData;
 use sp_std::vec::Vec;
-use orml_utilities::with_transaction_result;
 use clover_traits::account::MergeAccount;
 
 mod default_weight;

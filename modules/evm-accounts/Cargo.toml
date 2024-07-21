@@ -18,7 +18,6 @@ sp-io = { workspace = true }
 sp-std = { workspace = true }
 fp-evm = { workspace = true }
 pallet-evm = { workspace = true }
-orml-utilities = { workspace = true }
 impl-trait-for-tuples = { workspace = true }
 clover-traits = { workspace = true }
 
