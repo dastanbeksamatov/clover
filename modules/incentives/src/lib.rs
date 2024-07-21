@@ -4,10 +4,7 @@
 //! Implements clover incentives based on reward pool
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use codec::{Decode, Encode};
-use frame_support::{
-  decl_module, decl_error, decl_storage, debug,
-};
+use parity_scale_codec::{Decode, Encode};
 use sp_runtime::{
   DispatchError,
   RuntimeDebug,
@@ -18,7 +15,7 @@ use sp_runtime::{
 };
 use sp_std::prelude::*;
 use sp_std::vec;
-use primitives::{Balance, CurrencyId, Share, };
+use clover_primitives::{Balance, CurrencyId, Share, };
 use clover_traits::{RewardPoolOps, IncentiveOps, IncentivePoolAccountInfo, };
 use reward_pool::traits::RewardHandler;
 
@@ -47,7 +44,7 @@ pub enum PoolId {
   Dex(PairKey),
 }
 
-pub trait Trait: frame_system::Config{
+pub trait Trait: frame_system::Config {
   type RewardPool:  RewardPoolOps<Self::AccountId, PoolId, Share, Balance>;
 }
 

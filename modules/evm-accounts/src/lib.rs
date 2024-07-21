@@ -7,9 +7,8 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use codec::Encode;
-use frame_support::{
-	decl_error, decl_event, decl_module, decl_storage, ensure,
+use parity_scale_codec::Encode;
+use frame_support::{ensure,
 	traits::{Currency, HandleLifetime, OnKilledAccount, ReservableCurrency, },
 	weights::Weight,
 	StorageMap,
@@ -21,6 +20,7 @@ use sp_io::{crypto::secp256k1_ecdsa_recover, hashing::keccak_256};
 use sp_std::marker::PhantomData;
 use sp_std::vec::Vec;
 use clover_traits::account::MergeAccount;
+use type_utils::with_transaction_result;
 
 mod default_weight;
 mod mock;
@@ -34,39 +34,47 @@ pub type EcdsaSignature = ecdsa::Signature;
 /// Evm Address.
 pub type EvmAddress = sp_core::H160;
 
-pub trait Config: frame_system::Config{
-	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
+pub use pallet::*;
 
-	/// The Currency for managing Evm account assets.
-	type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
+#[frame_support::pallet]
+pub mod pallet {
+	use super::*;
+	use frame_support::{pallet_prelude::{ValueQuery, *}, Blake2_128Concat, Twox64Concat};
+	use frame_system::pallet_prelude::{OriginFor, *};
 
-	/// Mapping from address to account id.
-	type AddressMapping: AddressMapping<Self::AccountId>;
+	#[pallet::config]
 
-	/// Merge free balance from source to dest.
-	type MergeAccount: MergeAccount<Self::AccountId>;
+	pub trait Config: frame_system::Config {
+		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+	
+		/// The Currency for managing Evm account assets.
+		type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
+	
+		/// Mapping from address to account id.
+		type AddressMapping: AddressMapping<Self::AccountId>;
+	
+		/// Merge free balance from source to dest.
+		type MergeAccount: MergeAccount<Self::AccountId>;
+	
+		/// Handler to kill account in system.
+		type KillAccount: HandleLifetime<Self::AccountId>;
+	
+		/// Weight information for the extrinsics in this module.
+		type WeightInfo: WeightInfo;
+	}
 
-	/// Handler to kill account in system.
-	type KillAccount: HandleLifetime<Self::AccountId>;
-
-	/// Weight information for the extrinsics in this module.
-	type WeightInfo: WeightInfo;
-}
-
-decl_event!(
-	pub enum Event<T> where
-		<T as frame_system::Config>::AccountId,
-		EvmAddress = EvmAddress,
+	#[pallet::event]
+	#[pallet::generate_deposit(pub(super) fn deposit_event)]
+	pub enum Event<T: Config>
 	{
 		/// Mapping between Substrate accounts and EVM accounts
 		/// claim account. \[account_id, evm_address\]
-		ClaimAccount(AccountId, EvmAddress),
+		ClaimAccount(T::AccountId, EvmAddress),
 	}
-);
 
-decl_error! {
 	/// Error for evm accounts module.
-	pub enum Error for Module<T: Config> {
+	#[pallet::error] 
+	pub enum Error<T> {
 		/// AccountId has mapped
 		AccountIdHasMapped,
 		/// Eth address has mapped
@@ -80,24 +88,35 @@ decl_error! {
 		/// Account still has active reserved
 		StillHasActiveReserved,
 	}
-}
 
-decl_storage! {
-	trait Store for Module<T: Config> as EvmAccounts {
-		pub Accounts get(fn accounts): map hasher(twox_64_concat) EvmAddress => Option<T::AccountId>;
-		pub EvmAddresses get(fn evm_addresses): map hasher(twox_64_concat) T::AccountId => Option<EvmAddress>;
-	}
-}
+	#[pallet::storage]
+    #[pallet::getter(fn accounts)]
+    pub type Accounts<T: Config> = StorageMap<
+        _,
+        Twox64Concat,
+        EvmAddress,
+        Option<T::AccountId>,
+        ValueQuery,
+    >;
 
-decl_module! {
-	pub struct Module<T: Config> for enum Call where origin: T::Origin {
-		type Error = Error<T>;
-		fn deposit_event() = default;
+	/// Claim account mapping between Substrate accounts and EVM accounts.
+    #[pallet::storage]
+    #[pallet::getter(fn evm_addresses)]
+    pub type EvmAddresses<T: Config> = StorageMap<
+        _,
+        Twox64Concat,
+        T::AccountId,
+        Option<EvmAddress>,
+        ValueQuery,
+    >;
 
-		/// Claim account mapping between Substrate accounts and EVM accounts.
+
+	#[pallet::call]
+	impl<T: Config> Pallet<T> {
 		/// Ensure eth_address has not been mapped.
-		#[weight = T::WeightInfo::claim_account()]
-		pub fn claim_account(origin, eth_address: EvmAddress, eth_signature: EcdsaSignature) {
+		#[pallet::call_index(0)]
+		#[pallet::weight(T::WeightInfo::claim_account())]
+		pub fn claim_account(origin: OriginFor<T>, eth_address: EvmAddress, eth_signature: EcdsaSignature) {
 			let who = ensure_signed(origin)?;
 
 			// ensure account_id and eth_address has not been mapped
@@ -136,13 +155,12 @@ decl_module! {
 
 				Self::deposit_event(RawEvent::ClaimAccount(who, eth_address));
 				Ok(())
-			})?;
-
+			})?; 
 		}
 	}
 }
 
-impl<T: Config> Module<T> {
+impl<T: Config> Pallet<T> {
 	// Constructs the message that Ethereum RPC's `personal_sign` and `eth_sign`
 	// would sign.
 	pub fn ethereum_signable_message(what: &[u8], extra: &[u8]) -> Vec<u8> {
@@ -226,7 +244,7 @@ where
 pub struct CallKillAccount<T>(PhantomData<T>);
 impl<T: Config> OnKilledAccount<T::AccountId> for CallKillAccount<T> {
 	fn on_killed_account(who: &T::AccountId) {
-		Module::<T>::on_killed_account(&who);
+		Pallet::<T>::on_killed_account(&who);
 	}
 }
 

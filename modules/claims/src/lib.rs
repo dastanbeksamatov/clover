@@ -4,7 +4,7 @@
 //! Module to process claims from ethereum like addresses(e.g. bsc).
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use codec::Encode;
+use parity_scale_codec::Encode;
 use frame_support::traits::{Currency, ExistenceRequirement, Get, WithdrawReasons};
 use frame_system::ensure_signed;
 use sp_io::{crypto::secp256k1_ecdsa_recover, hashing::keccak_256};
@@ -113,7 +113,6 @@ pub mod pallet {
 
   #[pallet::event]
   #[pallet::generate_deposit(pub(super) fn deposit_event)]
-  #[pallet::metadata(T::AccountId = "AccountId")]
   pub enum Event<T: Config> {
     /// Bridge Account Changed
     BridgeAccountChanged(T::AccountId),
@@ -234,7 +233,7 @@ pub mod pallet {
     /// update the bridge account for the target network
     #[pallet::weight(T::DbWeight::get().writes(2))]
     #[frame_support::transactional]
-    pub(super) fn set_bridge_account_elastic(
+    pub fn set_bridge_account_elastic(
       origin: OriginFor<T>,
       network: BridgeNetworks,
       to: T::AccountId,

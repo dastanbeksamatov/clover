@@ -2,7 +2,7 @@
 // This file is part of Clover.
 
 use sp_std::prelude::*;
-use codec::{Encode, Decode};
+use parity_scale_codec::{Encode, Decode};
 use sp_runtime::{
   RuntimeDebug,
 };

@@ -45,7 +45,7 @@ fn generate_clover_address<Pair>(seed: &str) -> String
     where Pair: sp_core::Pair, Pair::Public: Into<MultiSigner> {
     let (pair, _) = Pair::from_phrase(seed, None).unwrap();
     let account = pair.public().into().into_account();
-    account.to_ss58check_with_version(Ss58AddressFormat::SubstrateAccount)
+    account.to_ss58check_with_version(Ss58AddressFormat::custom(42))
 }
 
 fn main() {

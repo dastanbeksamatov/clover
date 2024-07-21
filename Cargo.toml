@@ -19,6 +19,7 @@ members = [
 
 [workspace.dependencies]
 parity-scale-codec = { default-features = false, version = "3.0.0" }
+scale-info = { version = "2.5.0", default-features = false, features = ["derive"] }
 enum-iterator = "0.6.0"
 serde = { features = ['derive'], version = '1.0.101' }
 serde_json = "1.0"

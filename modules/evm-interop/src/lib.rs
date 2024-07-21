@@ -44,7 +44,7 @@ pub mod pallet {
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
 
     #[pallet::event]
-    #[pallet::metadata(T::AccountId = "AccountId")]
+    #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {}
 
     #[pallet::call]
@@ -56,13 +56,13 @@ pub mod pallet {
         /// Be careful!
         #[pallet::weight(T::DbWeight::get().reads_writes(2, 2))]
         #[frame_support::transactional]
-        pub(super) fn transfer_to_evm(
+        pub fn transfer_to_evm(
             origin: OriginFor<T>,
             to: EvmAddress,
             amount: BalanceOf<T>,
         ) -> DispatchResultWithPostInfo {
             let from = ensure_signed(origin)?;
-
+ 
             let account = T::AddressMapping::into_account_id(to);
 
             T::Currency::transfer(&from, &account, amount, ExistenceRequirement::AllowDeath)?;
