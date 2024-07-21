@@ -78,7 +78,6 @@ pallet-membership = { workspace = true }
 pallet-scheduler = { workspace = true }
 pallet-utility = { workspace = true }
 frame-benchmarking = { workspace = true }
-orml-utilities = { workspace = true }
 
 [features]
 default = [ 'std' ]
@@ -95,7 +94,6 @@ std = [
 	'frame-support/std',
 	'frame-system-rpc-runtime-api/std',
 	'frame-system/std',
-	"orml-utilities/std",
 	'pallet-authority-discovery/std',
 	'pallet-authorship/std',
 	'pallet-babe/std',

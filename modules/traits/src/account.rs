@@ -1,5 +1,4 @@
 use impl_trait_for_tuples::impl_for_tuples;
-use orml_utilities::with_transaction_result;
 use sp_runtime::DispatchResult;
 
 pub trait MergeAccount<AccountId> {

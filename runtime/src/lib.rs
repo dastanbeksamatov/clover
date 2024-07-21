@@ -591,7 +591,7 @@ parameter_types! {
   pub const PreimageByteDeposit: Balance = 10 * MILLICENTS;
   pub const InstantAllowed: bool = true;
   pub const MaxVotes: u32 = 100;
-  pub const MaxProposals: u32 = 100;
+  pub const MaxProposals: u32 = 100; 
 }
 
 impl pallet_democracy::Config for Runtime {
