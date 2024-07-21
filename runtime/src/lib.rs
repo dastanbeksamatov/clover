@@ -6,7 +6,7 @@
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
-use codec::Decode;
+use parity_scale_codec::Decode;
 use sp_core::{crypto::KeyTypeId, crypto::Public, OpaqueMetadata, H160, H256, U256};
 use sp_runtime::curve::PiecewiseLinear;
 use sp_runtime::traits::{
@@ -40,7 +40,7 @@ pub use sp_runtime::BuildStorage;
 
 pub use pallet_staking::StakerStatus;
 
-use codec::Encode;
+use parity_scale_codec::Encode;
 use evm_accounts::EvmAddressMapping;
 use fp_rpc::TransactionStatus;
 pub use frame_support::{
@@ -62,9 +62,9 @@ use pallet_evm::{Account as EVMAccount, EnsureAddressTruncated, FeeCalculator, R
 pub use pallet_timestamp::Call as TimestampCall;
 pub use sp_runtime::{Perbill, Permill};
 
-pub use primitives::{
-  currency::*, AccountId, AccountIndex, Amount, Balance, BlockNumber, CurrencyId, EraIndex, Hash,
-  Index, Moment, Price, Rate, Share, Signature,
+pub use clover_primitives::{
+    currency::*, AccountId, AccountIndex, Amount, Balance, BlockNumber, CurrencyId, EraIndex, Hash,
+    Index, Moment, Price, Rate, Share, Signature,
 };
 
 pub use constants::time::*;
@@ -1086,7 +1086,7 @@ construct_runtime!(
     CloverClaims: clover_claims::{Module, Call, Storage, Event<T>, ValidateUnsigned},
     CloverCRC20: clover_crc20::{Module, Call, Storage, Event<T>},
   }
-);
+); 
 
 /// The address format for describing accounts.
 pub type Address = sp_runtime::MultiAddress<AccountId, AccountIndex>;
@@ -1223,7 +1223,7 @@ impl_runtime_apis! {
       _slot_number: sp_consensus_babe::Slot,
       authority_id: sp_consensus_babe::AuthorityId,
       ) -> Option<sp_consensus_babe::OpaqueKeyOwnershipProof> {
-      use codec::Encode;
+      use parity_scale_codec::Encode;
 
       Historical::prove((sp_consensus_babe::KEY_TYPE, authority_id))
         .map(|p| p.encode())

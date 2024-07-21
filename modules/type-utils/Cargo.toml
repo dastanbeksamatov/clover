@@ -8,3 +8,12 @@ repository = 'https://github.com/clover-network/clover'
 version = '0.9.0'
 
 [dependencies]
+frame-support = { workspace = true }
+sp-runtime = { workspace = true }
+
+[features]
+default = []
+std = [
+    'frame-support/std',
+    'sp-runtime/std',
+]

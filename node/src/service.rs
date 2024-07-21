@@ -14,7 +14,12 @@ pub use sc_executor::NativeExecutor;
 use sc_telemetry::TelemetryConnectionNotifier;
 use fc_consensus::FrontierBlockImport;
 use fc_mapping_sync::MappingSyncWorker;
-use futures::StreamExt;
+use futures::StreamExt; 
+use sc_consensus_manual_seal::{EngineCommand, ManualSealParams};
+use sc_telemetry::tracing::log;
+use clover_primitives::Hash;
+
+use crate::cli::Cli;
 
 // Our native executor instance.
 native_executor_instance!(
@@ -55,7 +60,7 @@ pub fn new_partial(config: &Configuration) -> Result<sc_service::PartialComponen
     impl Fn(
       crate::rpc::DenyUnsafe,
       crate::rpc::SubscriptionTaskExecutor,
-      Arc<sc_network::NetworkService<Block, primitives::Hash>>,
+      Arc<sc_network::NetworkService<Block, clover_primitives::Hash>>,
     ) -> crate::rpc::IoHandler,
     (
       sc_consensus_babe::BabeBlockImport<Block, FullClient, FullGrandpaBlockImport>,

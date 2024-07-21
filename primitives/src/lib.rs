@@ -2,7 +2,7 @@
 
 #[macro_use]
 extern crate num_derive;
-use codec::{Decode, Encode};
+use parity_scale_codec::{Decode, Encode};
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};

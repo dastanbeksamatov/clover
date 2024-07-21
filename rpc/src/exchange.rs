@@ -2,7 +2,7 @@
 use super::*;
 use std::fmt::Display;
 
-use codec::{Codec, Decode, Encode};
+use parity_scale_codec::{Codec, Decode, Encode};
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};

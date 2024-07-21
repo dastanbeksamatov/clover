@@ -8,7 +8,7 @@ use sp_core::H256;
 use sp_runtime::{testing::Header, traits::IdentityLookup, Perbill};
 pub use pallet_balances::Call as BalancesCall;
 
-pub use primitives::{
+pub use clover_primitives::{
   AccountId, AccountIndex, Amount, Balance,
   CurrencyId,
   EraIndex, Hash, Index, Moment,

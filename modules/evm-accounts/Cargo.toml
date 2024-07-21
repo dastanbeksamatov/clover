@@ -20,6 +20,7 @@ fp-evm = { workspace = true }
 pallet-evm = { workspace = true }
 impl-trait-for-tuples = { workspace = true }
 clover-traits = { workspace = true }
+type-utils = { path = '../type-utils', default-features = false }
 
 [dev-dependencies]
 pallet-balances = { workspace = true }

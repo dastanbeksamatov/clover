@@ -1,6 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 use super::*;
-use codec::{Codec, };
+use parity_scale_codec::{Codec, };
 use std::fmt::Display;
 
 pub use clover_rpc_runtime_api::IncentivePoolApi as IncentivePoolRuntimeApi;

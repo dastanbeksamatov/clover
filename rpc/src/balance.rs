@@ -1,7 +1,7 @@
 use super::*;
 
 use std::fmt::Display;
-use codec::Codec;
+use parity_scale_codec::Codec;
 
 use jsonrpc_core::{Error as RpcError, ErrorCode, Result};
 use jsonrpc_derive::rpc;

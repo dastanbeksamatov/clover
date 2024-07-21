@@ -24,6 +24,7 @@ sp-std = { workspace = true }
 pallet-balances = { workspace = true }
 impl-trait-for-tuples = { workspace = true }
 clover-primitives = { workspace = true }
+type-utils = { path = '../type-utils', default-features = false }
 
 [dev-dependencies]
 sp-core = { workspace = true }

@@ -6,7 +6,7 @@
 //! Allow add shares, withdraw shares and coressponding native currency
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use codec::{Decode, Encode, FullCodec, HasCompact};
+use parity_scale_codec::{Decode, Encode, FullCodec, HasCompact};
 use frame_support::{
   decl_error, decl_event, decl_module, decl_storage, Parameter,
   debug,
@@ -29,7 +29,7 @@ use sp_std::{
 };
 use sp_std::vec;
 
-use primitives::{Balance, CurrencyId, Price, Share, Ratio};
+use clover_primitives::{Balance, CurrencyId, Price, Share, Ratio};
 
 pub mod traits;
 
