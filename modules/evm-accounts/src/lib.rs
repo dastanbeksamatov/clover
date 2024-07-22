@@ -7,13 +7,10 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use parity_scale_codec::Encode;
 use frame_support::{ensure,
 	traits::{Currency, HandleLifetime, OnKilledAccount, ReservableCurrency, },
-	weights::Weight,
-	StorageMap,
+	weights::Weight, 
 };
-use frame_system::ensure_signed;
 use pallet_evm::AddressMapping;
 use sp_core::{crypto::AccountId32, ecdsa, H160};
 use sp_io::{crypto::secp256k1_ecdsa_recover, hashing::keccak_256};
@@ -39,8 +36,10 @@ pub use pallet::*;
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use frame_support::{pallet_prelude::{ValueQuery, *}, Blake2_128Concat, Twox64Concat};
+	use frame_support::{pallet_prelude::{OptionQuery, ValueQuery, *}, Twox64Concat};  
 	use frame_system::pallet_prelude::{OriginFor, *};
+	use sp_runtime::traits::Zero;
+use sp_std::convert::TryInto;
 
 	#[pallet::config]
 
@@ -55,13 +54,16 @@ pub mod pallet {
 	
 		/// Merge free balance from source to dest.
 		type MergeAccount: MergeAccount<Self::AccountId>;
-	
+	  
 		/// Handler to kill account in system.
 		type KillAccount: HandleLifetime<Self::AccountId>;
 	
 		/// Weight information for the extrinsics in this module.
 		type WeightInfo: WeightInfo;
 	}
+
+	#[pallet::pallet]
+	pub struct Pallet<T>(_);
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -95,8 +97,8 @@ pub mod pallet {
         _,
         Twox64Concat,
         EvmAddress,
-        Option<T::AccountId>,
-        ValueQuery,
+        T::AccountId,
+        OptionQuery,
     >;
 
 	/// Claim account mapping between Substrate accounts and EVM accounts.
@@ -105,18 +107,18 @@ pub mod pallet {
     pub type EvmAddresses<T: Config> = StorageMap<
         _,
         Twox64Concat,
-        T::AccountId,
-        Option<EvmAddress>,
-        ValueQuery,
+        T::AccountId, 
+        EvmAddress,
+        OptionQuery,
     >;
 
 
 	#[pallet::call]
-	impl<T: Config> Pallet<T> {
+	impl<T: Config> Pallet<T> {  
 		/// Ensure eth_address has not been mapped.
 		#[pallet::call_index(0)]
 		#[pallet::weight(T::WeightInfo::claim_account())]
-		pub fn claim_account(origin: OriginFor<T>, eth_address: EvmAddress, eth_signature: EcdsaSignature) {
+		pub fn claim_account(origin: OriginFor<T>, eth_address: EvmAddress, eth_signature: EcdsaSignature) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 
 			// ensure account_id and eth_address has not been mapped
@@ -129,17 +131,17 @@ pub mod pallet {
 
 				// check if the evm padded address already exists
 				let account_id = T::AddressMapping::into_account_id(eth_address);
-				let mut nonce = <T as frame_system::Config>::Index::default();
+				let mut nonce = Zero::zero();
 				if frame_system::Account::<T>::contains_key(&account_id) {
 					// merge balance from `evm padded address` to `origin`
 					T::MergeAccount::merge_account(&account_id, &who)?;
 
-					nonce = frame_system::Module::<T>::account_nonce(&account_id);
+					nonce = frame_system::Pallet::<T>::account_nonce(&account_id);
 					// finally kill the account
 					let _ = T::KillAccount::killed(&account_id);
 				}
 				//	make the origin nonce the max between origin amd evm padded address
-				let origin_nonce = frame_system::Module::<T>::account_nonce(&who);
+				let origin_nonce = frame_system::Pallet::<T>::account_nonce(&who);
 				if origin_nonce < nonce {
 					frame_system::Account::<T>::mutate(&who, |v| {
 						v.nonce = nonce;
@@ -153,9 +155,11 @@ pub mod pallet {
 				Accounts::<T>::insert(eth_address, &who);
 				EvmAddresses::<T>::insert(&who, eth_address);
 
-				Self::deposit_event(RawEvent::ClaimAccount(who, eth_address));
+				Self::deposit_event(Event::ClaimAccount(who, eth_address));
 				Ok(())
-			})?; 
+			})?;
+
+			Ok(().into())
 		}
 	}
 }
@@ -201,8 +205,8 @@ impl<T: Config> Pallet<T> {
 		let mut r = [0u8; 65];
 		r[0..64].copy_from_slice(&sig.serialize()[..]);
 		r[64] = recovery_id.serialize();
-		EcdsaSignature::from_slice(&r)
-	}
+		EcdsaSignature::from_slice(&r).expect("signature is 65 bytes and no validity check is done; qed") 
+	} 
 
 	fn on_killed_account(who: &T::AccountId) {
 		// Here should be no balance, if there is, it will be burned
@@ -227,17 +231,6 @@ where
 			data[4..24].copy_from_slice(&address[..]);
 			AccountId32::from(data).into()
 		}
-	}
-
-  fn to_evm_address(account_id: &T::AccountId) -> Option<H160> {
-		EvmAddresses::<T>::get(account_id).or_else(|| {
-			let data: [u8; 32] = account_id.clone().into().into();
-			if data.starts_with(b"evm:") {
-				Some(H160::from_slice(&data[4..24]))
-			} else {
-				None
-			}
-		})
 	}
 }
 

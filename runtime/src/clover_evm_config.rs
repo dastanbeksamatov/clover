@@ -41,6 +41,7 @@ impl CloverEvmConfig {
 			has_self_balance: true,
 			has_ext_code_hash: true,
 			estimate: false,
+			..Default::default()
 		}
 	}
 }

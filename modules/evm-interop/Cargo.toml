@@ -12,6 +12,7 @@ version = '0.9.0'
 [dependencies]
 serde = { workspace = true}
 parity-scale-codec = { workspace = true }
+scale-info = { workspace = true }
 rustc-hex = { workspace = true }
 
 # substrate frame dependencies
@@ -39,6 +40,7 @@ std = [
 	"log/std",
 	"pallet-evm/std",
 	"parity-scale-codec/std",
+	"scale-info/std",
 	"rustc-hex/std",
 	"serde/std",
 	"sp-core/std",

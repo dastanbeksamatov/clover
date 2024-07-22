@@ -14,7 +14,9 @@ use clover_traits::account::MergeAccount;
 pub struct Author;
 impl OnUnbalanced<NegativeImbalance> for Author {
   fn on_nonzero_unbalanced(amount: NegativeImbalance) {
-    Balances::resolve_creating(&Authorship::author(), amount);
+    if let Some(author) = &Authorship::author() {
+      Balances::resolve_creating(author, amount.peek());
+    }
   }
 }
 
@@ -55,13 +57,16 @@ impl<T> WeightToFeePolynomial for WeightToFee<T> where
 /// without applying the static fee multiplier
 /// the value is incorrect (1_000_000_000 in clover testnet, spec version4).
 #[allow(dead_code)]
-pub struct StaticFeeMultiplierUpdate<T, S, V, M>(sp_std::marker::PhantomData<(T, S, V, M)>);
+pub struct StaticFeeMultiplierUpdate<T, S, V, M, N>(sp_std::marker::PhantomData<(T, S, V, M, N)>);
 
-impl<T, S, V, M> MultiplierUpdate for StaticFeeMultiplierUpdate<T, S, V, M>
-  where T: frame_system::Config, S: Get<Perquintill>, V: Get<Multiplier>, M: Get<Multiplier>,
+impl<T, S, V, M, N> MultiplierUpdate for StaticFeeMultiplierUpdate<T, S, V, M, N>
+  where T: frame_system::Config, S: Get<Perquintill>, V: Get<Multiplier>, M: Get<Multiplier>, N: Get<Multiplier>,
 {
   fn min() -> Multiplier {
     M::get()
+  }
+  fn max() -> Multiplier {
+    N::get()
   }
   fn target() -> Perquintill {
     S::get()
@@ -71,8 +76,8 @@ impl<T, S, V, M> MultiplierUpdate for StaticFeeMultiplierUpdate<T, S, V, M>
   }
 }
 
-impl<T, S, V, M> Convert<Multiplier, Multiplier> for StaticFeeMultiplierUpdate<T, S, V, M>
-  where T: frame_system::Config, S: Get<Perquintill>, V: Get<Multiplier>, M: Get<Multiplier>,
+impl<T, S, V, M, N> Convert<Multiplier, Multiplier> for StaticFeeMultiplierUpdate<T, S, V, M, N>
+  where T: frame_system::Config, S: Get<Perquintill>, V: Get<Multiplier>, M: Get<Multiplier>, N: Get<Multiplier>,
 {
   fn convert(_previous: Multiplier) -> Multiplier {
     Multiplier::saturating_from_integer(1)

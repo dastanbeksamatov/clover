@@ -31,14 +31,14 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
         /// Mapping from address to account id.
         type AddressMapping: AddressMapping<Self::AccountId>;
         type Currency: Currency<Self::AccountId>;
     }
 
     #[pallet::pallet]
-    pub struct Pallet<T>(sp_std::marker::PhantomData<T>);
+    pub struct Pallet<T>(_);
 
     #[pallet::hooks]
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
