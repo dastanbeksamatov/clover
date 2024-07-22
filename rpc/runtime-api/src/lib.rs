@@ -3,7 +3,7 @@
 sp_api::decl_runtime_apis! {
 	pub trait CurrencyBalanceApi<AccountId, CurrencyId, Balance> where
 		AccountId: parity_scale_codec::Codec,
-        CurrencyId: parity_scale_codec::Codec + scale_info::TypeInfo,
+        CurrencyId: parity_scale_codec::Codec,
         Balance: parity_scale_codec::Codec {
 		// Get account balance of a currency
 		fn account_balance(account: AccountId, currency_id: Option<CurrencyId>) -> sp_std::vec::Vec<(CurrencyId, Balance)>;
@@ -15,7 +15,7 @@ sp_api::decl_runtime_apis! {
 
 	pub trait CurrencyExchangeApi<AccountId, CurrencyId, Balance, Rate, Share> where
 		AccountId: parity_scale_codec::Codec,
-		CurrencyId: parity_scale_codec::Codec + scale_info::TypeInfo,
+		CurrencyId: parity_scale_codec::Codec,
 		Balance: parity_scale_codec::Codec,
 		Rate: parity_scale_codec::Codec,
 		Share: parity_scale_codec::Codec, {
@@ -30,7 +30,7 @@ sp_api::decl_runtime_apis! {
 
   pub trait IncentivePoolApi<AccountId, CurrencyId, Balance, Share> where
     AccountId: parity_scale_codec::Codec,
-    CurrencyId: parity_scale_codec::Codec + scale_info::TypeInfo,
+    CurrencyId: parity_scale_codec::Codec,
     Balance: parity_scale_codec::Codec,
     Share: parity_scale_codec::Codec, {
     fn get_all_incentive_pools() -> sp_std::vec::Vec<(CurrencyId, CurrencyId, Share, Balance)>;

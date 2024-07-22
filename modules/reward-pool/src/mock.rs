@@ -50,7 +50,7 @@ parameter_types! {
 }
 
 impl frame_system::Config for TestRuntime {
-  type Origin = Origin;
+  type RuntimeOrigin = RuntimeOrigin;
   type Index = u64;
   type BlockNumber = BlockNumber;
   type Call = ();
@@ -77,7 +77,7 @@ impl frame_system::Config for TestRuntime {
   type SystemWeightInfo = ();
 }
 
-pub type System = frame_system::Module<TestRuntime>;
+pub type System = frame_system::Pallet<TestRuntime>;
 
 parameter_types! {
   pub const ExistentialDeposit: u128 = 500;

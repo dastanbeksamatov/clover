@@ -9,6 +9,7 @@ version = '0.9.0'
 
 [dependencies]
 parity-scale-codec = { workspace = true }
+scale-info = { workspace = true }
 frame-support = { workspace = true }
 frame-system = { workspace = true }
 libsecp256k1 = { workspace = true }
@@ -34,6 +35,7 @@ std = [
 	"libsecp256k1/std",
 	"pallet-evm/std",
 	"parity-scale-codec/std",
+	"scale-info/std",
 	"sp-core/std",
 	"sp-io/std",
 	"sp-runtime/std",

@@ -11,10 +11,9 @@ use sp_io::{crypto::secp256k1_ecdsa_recover, hashing::keccak_256};
 use sp_runtime::{
   traits::{AccountIdConversion, Saturating},
   transaction_validity::{InvalidTransaction, TransactionValidity, ValidTransaction},
-  ModuleId,
 };
-use sp_std::prelude::*;
-use hex_literal::hex;
+use sp_std::prelude::*; 
+use sp_std::convert::TryInto;
 
 pub use pallet::*;
 pub mod ethereum_address;
@@ -31,30 +30,30 @@ pub use ethereum_address::*;
 #[frame_support::pallet]
 pub mod pallet {
   use super::*;
-  use frame_support::pallet_prelude::*;
+  use frame_support::{pallet_prelude::{OptionQuery, *}, PalletId};
   use frame_system::pallet_prelude::*;
 
   pub type BalanceOf<T> =
     <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
   #[pallet::config]
-  pub trait Config: frame_system::Config {
-    type ModuleId: Get<ModuleId>;
-    type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+  pub trait Config: frame_system::Config { 
+    type ModuleId: Get<PalletId>;
+    type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
     type Currency: Currency<Self::AccountId>;
     type Prefix: Get<&'static [u8]>;
   }
 
   #[pallet::pallet]
-  pub struct Pallet<T>(sp_std::marker::PhantomData<T>);
+  pub struct Pallet<T>(_);
 
   #[pallet::hooks]
   impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
     fn on_runtime_upgrade() -> Weight {
       if Self::pallet_storage_version() >= 2 {
         sp_runtime::print("claims storage version is latest");
-        return 0;
-      }
+        return Weight::from_parts(0, 0);
+      } 
 
       sp_runtime::print("clover claims runtime upgrade");
       // copy existing claims to elastic claims storage
@@ -64,7 +63,7 @@ pub mod pallet {
             ElasticClaims::<T>::insert(BridgeNetworks::BSC, k, v);
           }
         } else {
-          debug::error!("key: {:?} already exists in elastic claims!", k);
+          log::error!("key: {:?} already exists in elastic claims!", k);
         }
       }
 
@@ -91,12 +90,12 @@ pub mod pallet {
 
       MintFee::<T>::kill();
       BurnFee::<T>::kill();
-      Claims::<T>::remove_all();
-      BridgeAccount::<T>::kill();
+      let _ = Claims::<T>::clear(100, None);
+      BridgeAccount::<T>::kill(); 
 
       PalletStorageVersion::<T>::put(2);
 
-      100
+      Weight::from_parts(1_253_760_000, 0)
     }
   }
 
@@ -150,7 +149,7 @@ pub mod pallet {
   }
 
   /// Supported bridge networks By Clover
-  #[derive(Encode, Decode, Clone, Copy, PartialEq, Eq, RuntimeDebug)]
+  #[derive(Encode, Decode, Clone, Copy, PartialEq, Eq, RuntimeDebug, MaxEncodedLen, TypeInfo)]
   pub enum BridgeNetworks {
     /// Binance Smart Chain
     BSC = 0,
@@ -180,11 +179,11 @@ pub mod pallet {
 
   #[pallet::storage]
   #[pallet::getter(fn mint_fee)]
-  pub(super) type MintFee<T: Config> = StorageValue<_, Option<BalanceOf<T>>, ValueQuery>;
+  pub(super) type MintFee<T: Config> = StorageValue<_, BalanceOf<T>, OptionQuery>;
 
   #[pallet::storage]
   #[pallet::getter(fn burn_fee)]
-  pub(super) type BurnFee<T: Config> = StorageValue<_, Option<BalanceOf<T>>, ValueQuery>;
+  pub(super) type BurnFee<T: Config> = StorageValue<_, BalanceOf<T>, OptionQuery>;
 
   /// bridge account to mint bridge transactions
   /// it's a good practice to configure a separate bridge account for one bridge network
@@ -234,6 +233,7 @@ pub mod pallet {
   #[pallet::call]
   impl<T: Config> Pallet<T> {
     /// update the bridge account for the target network
+    #[pallet::call_index(0)]
     #[pallet::weight(T::DbWeight::get().writes(2))]
     #[frame_support::transactional]
     pub fn set_bridge_account_elastic(
@@ -250,6 +250,7 @@ pub mod pallet {
       Ok(().into())
     }
 
+    #[pallet::call_index(1)]
     #[pallet::weight(T::DbWeight::get().writes(2))]
     #[frame_support::transactional]
     pub fn set_claim_limit_elastic(
@@ -265,6 +266,7 @@ pub mod pallet {
       Ok(().into())
     }
 
+    #[pallet::call_index(2)]
     #[pallet::weight(T::DbWeight::get().writes(1))]
     #[frame_support::transactional]
     pub fn set_bridge_fee_elastic(
@@ -282,6 +284,7 @@ pub mod pallet {
       Ok(().into())
     }
 
+    #[pallet::call_index(3)]
     #[pallet::weight(T::DbWeight::get().writes(3))]
     #[frame_support::transactional]
     pub fn mint_claim_elastic(
@@ -299,6 +302,7 @@ pub mod pallet {
       Ok(().into())
     }
 
+    #[pallet::call_index(4)]
     #[pallet::weight(0)]
     #[frame_support::transactional]
     pub fn claim_elastic(
@@ -316,6 +320,7 @@ pub mod pallet {
       Ok(().into())
     }
 
+    #[pallet::call_index(5)]
     #[pallet::weight(T::DbWeight::get().reads_writes(2, 3))]
     #[frame_support::transactional]
     pub fn burn_elastic(
@@ -373,7 +378,7 @@ pub mod pallet {
     type Call = Call<T>;
 
     fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
-      if let Call::claim_elastic(network, account, tx, sig) = call {
+      if let Call::claim_elastic{ network, dest: account, tx, sig } = call {
         Self::do_validate(network, account, tx, sig)
       } else {
         InvalidTransaction::Call.into()
@@ -384,7 +389,7 @@ pub mod pallet {
   impl<T: Config> Pallet<T> {
     /// the account to store the mint/claim fees
     pub fn account_id() -> T::AccountId {
-      T::ModuleId::get().into_account()
+      T::ModuleId::get().into_account_truncating()
     }
 
     fn do_validate(
@@ -462,10 +467,10 @@ pub mod pallet {
       // update claim limit
       ElasticClaimLimits::<T>::mutate(&network, |l| *l = l.saturating_sub(claim_amount));
       if mint_fee > 0u32.into() {
-        T::Currency::deposit_creating(&Self::account_id(), mint_fee);
+        let _ = T::Currency::deposit_creating(&Self::account_id(), mint_fee);
       }
       Ok(claim_amount)
-    }
+    } 
 
     fn do_claim(
       network: BridgeNetworks,
@@ -487,10 +492,10 @@ pub mod pallet {
 
       ensure!(address == signer, Error::<T>::SignatureNotMatch);
 
-      T::Currency::deposit_creating(&dest, amount);
+      let _ = T::Currency::deposit_creating(&dest, amount);
       ElasticClaims::<T>::insert(network, tx, (address, amount, true));
       Ok((signer, amount))
-    }
+    } 
 
     fn do_burn(
       who: T::AccountId,

@@ -1006,16 +1006,16 @@ parameter_types! {
 
 impl clover_claims::Config for Runtime {
   type ModuleId = ClaimsModuleId;
-  type Event = Event;
+  type Event = Event; 
   type Currency = Balances;
   type Prefix = Prefix;
 }
 
 impl clover_crc20::Config for Runtime {
   type ModuleId = CRC20ModuleId;
-  type Event = Event;
-  type Currency = Balances;
-  type Prefix = Prefix;
+  type Event = Event; 
+  type Currency = Balances; 
+  type Prefix = Prefix; 
 }
 
 parameter_types! {

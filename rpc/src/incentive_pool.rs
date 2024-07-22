@@ -37,9 +37,9 @@ where
   fn get_all_incentive_pools(&self,
                              at: Option<<Block as BlockT>::Hash>) -> Result<Vec<(CurrencyId, CurrencyId, String, String)>> {
     let api = self.client.runtime_api();
-    let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
+    let at = at.unwrap_or_else(|| self.client.info().best_hash);
 
-    api.get_all_incentive_pools(&at).map_err(|e| RpcError {
+    api.get_all_incentive_pools(at).map_err(|e| RpcError {
       code: ErrorCode::ServerError(Error::RuntimeError.into()),
       message: "Unable to get value.".into(),
       data: Some(format!("{:?}", e).into()),
