@@ -1,9 +1,9 @@
 
 use sp_arithmetic::{traits::{BaseArithmetic, Unsigned}};
 use sp_runtime::traits::Convert;
-use sp_runtime::{ DispatchResult, FixedPointNumber, Perquintill, Perbill, };
-use frame_support::transactional;
-use frame_support::traits::{Get, OnUnbalanced, Currency, ReservableCurrency, };
+use sp_runtime::{DispatchResult, FixedPointNumber, Perquintill, Perbill};
+use frame_support::{traits::ExistenceRequirement, transactional};
+use frame_support::traits::{Get, OnUnbalanced, Currency, ReservableCurrency, Imbalance};
 use frame_support::weights::{
     WeightToFeeCoefficient, WeightToFeeCoefficients, WeightToFeePolynomial,
 };
@@ -15,7 +15,7 @@ pub struct Author;
 impl OnUnbalanced<NegativeImbalance> for Author {
   fn on_nonzero_unbalanced(amount: NegativeImbalance) {
     if let Some(author) = &Authorship::author() {
-      Balances::resolve_creating(author, amount.peek());
+      Balances::resolve_creating(author, amount);
     }
   }
 }
@@ -28,10 +28,7 @@ fn merge_account(source: &AccountId, dest: &AccountId) -> DispatchResult {
      <Balances as ReservableCurrency<_>>::unreserve(source, Balances::reserved_balance(source));
 
      // transfer all free to dest
-     match Balances::transfer(Some(source.clone()).into(), dest.clone().into(), Balances::free_balance(source)) {
-       Ok(_) => Ok(()),
-       Err(e) => Err(e.error),
-     }
+    Balances::transfer(&source, &dest, Balances::free_balance(source), ExistenceRequirement::KeepAlive)
   }
 }
 

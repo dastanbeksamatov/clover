@@ -54,6 +54,7 @@ pub mod pallet {
         /// Pay attention while sending fund to a smart contract address
         /// It will not trigger the `receive` callback in the smart contract.
         /// Be careful!
+        #[pallet::call_index(0)]
         #[pallet::weight(T::DbWeight::get().reads_writes(2, 2))]
         #[frame_support::transactional]
         pub fn transfer_to_evm(

@@ -8,7 +8,7 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 use frame_election_provider_support::NoElection;
 use frame_support::traits::fungible::HoldConsideration;
-use frame_support::traits::{EitherOfDiverse, EqualPrivilegeOnly, LinearStoragePrice, Nothing, WithdrawReasons};
+use frame_support::traits::{EitherOfDiverse, EqualPrivilegeOnly, LinearStoragePrice, Nothing, WithdrawReasons, Hooks, OnFinalize};
 use frame_support::weights::ConstantMultiplier;
 use frame_support::PalletId;
 use core::convert::TryInto;
@@ -19,14 +19,14 @@ use sp_core::{ConstBool, ConstU32, ConstU64, ConstU8};
 use sp_core::{crypto::KeyTypeId, crypto::Public, OpaqueMetadata, H160, H256, U256};
 use sp_runtime::curve::PiecewiseLinear;
 use sp_runtime::traits::{
-    BlakeTwo256, Block as BlockT, Bounded, Convert, ConvertInto, NumberFor, OpaqueKeys, SaturatedConversion, StaticLookup
+    BlakeTwo256, Block as BlockT, Bounded, Convert, ConvertInto, NumberFor, OpaqueKeys, SaturatedConversion, StaticLookup, UniqueSaturatedInto,
 };
 use core::convert::TryFrom;
 use pallet_ethereum::{Transaction as EthereumTransaction, TransactionAction, TransactionData};
 use sp_runtime::{
     create_runtime_str, generic, impl_opaque_keys,
     transaction_validity::{TransactionPriority, TransactionSource, TransactionValidity},
-    ApplyExtrinsicResult, FixedPointNumber, OpaqueExtrinsic, Percent, Perquintill,
+    ApplyExtrinsicResult, FixedPointNumber, OpaqueExtrinsic, Percent, Perquintill, RuntimeAppPublic,
 };
 use sp_std::{marker::PhantomData, prelude::*};
 
@@ -388,7 +388,7 @@ pub struct FixedGasPrice;
 
 impl FeeCalculator for FixedGasPrice {
     fn min_gas_price() -> (U256, Weight) {
-        (50_000_000_000u64.into(), 0)
+        (50_000_000_000u64.into(), Weight::zero())
     }
 }
 
@@ -401,7 +401,7 @@ parameter_types! {
   pub const ChainId: u64 = CHAIN_ID;
 }
 
-static CLOVER_EVM_CONFIG: evm::Config = clover_evm_config::CloverEvmConfig::config();
+static CLOVER_EVM_CONFIG: pallet_evm::EvmConfig = clover_evm_config::CloverEvmConfig::config();
 const BLOCK_GAS_LIMIT: u64 = 75_000_000;
 const MAX_POV_SIZE: u64 = 5 * 1024 * 1024;
 
@@ -412,6 +412,31 @@ parameter_types! {
   pub WeightPerGas: Weight = Weight::from_parts(weight_per_gas(BLOCK_GAS_LIMIT, NORMAL_DISPATCH_RATIO, WEIGHT_MILLISECS_PER_BLOCK), 0);
   pub SuicideQuickClearLimit: u32 = 0;
 }
+
+// /// Wraps the author-scraping logic for consensus engines that can recover
+// /// the canonical index of an author. This then transforms it into the
+// /// registering account-ID of that session key index.
+// pub struct FindEvmAccountFromAuthorIndex<T, Inner>(sp_std::marker::PhantomData<(T, Inner)>);
+
+// impl<T, Inner: FindAuthor<u32>> FindAuthor<H160>
+// 	for FindEvmAccountFromAuthorIndex<T, Inner>
+// where
+// T: pallet_session::Config + evm_accounts::Config,
+// T::ValidatorId: Into<<T as frame_system::Config>::AccountId>,
+// {
+// 	fn find_author<'a, I>(digests: I) -> Option<H160>
+// 	where
+// 		I: 'a + IntoIterator<Item = (ConsensusEngineId, &'a [u8])>,
+// 	{
+// 		let i = Inner::find_author(digests)?;
+
+// 		let validators = <pallet_session::Pallet<T>>::validators();
+// 		let validator = validators.get(i as usize).cloned();
+
+//     validator.map(|x| evm_accounts::EvmAddresses::<T>::get(x).unwrap_or_default().into())
+// 	}
+// }
+
 
 impl pallet_evm::Config for Runtime {
     type FeeCalculator = FixedGasPrice;
@@ -429,7 +454,7 @@ impl pallet_evm::Config for Runtime {
     type BlockGasLimit = BlockGasLimit;
     type WeightPerGas = WeightPerGas;
     type OnChargeTransaction = ();
-    type FindAuthor = pallet_session::FindAccountFromAuthorIndex<Self, Babe>;
+    type FindAuthor = EthereumFindAuthor<Babe>;
     type GasLimitPovSizeRatio = GasLimitPovSizeRatio;
     type SuicideQuickClearLimit = SuicideQuickClearLimit;
     type OnCreate = ();
@@ -470,7 +495,7 @@ pub struct TransactionConverter;
 impl fp_rpc::ConvertTransaction<UncheckedExtrinsic> for TransactionConverter {
     fn convert_transaction(&self, transaction: pallet_ethereum::Transaction) -> UncheckedExtrinsic {
         UncheckedExtrinsic::new_unsigned(
-            pallet_ethereum::Call::<Runtime>::transact(transaction).into(),
+            pallet_ethereum::Call::<Runtime>::transact{ transaction }.into(),
         )
     }
 }
@@ -478,7 +503,7 @@ impl fp_rpc::ConvertTransaction<UncheckedExtrinsic> for TransactionConverter {
 impl fp_rpc::ConvertTransaction<OpaqueExtrinsic> for TransactionConverter {
     fn convert_transaction(&self, transaction: pallet_ethereum::Transaction) -> OpaqueExtrinsic {
         let extrinsic = UncheckedExtrinsic::new_unsigned(
-            pallet_ethereum::Call::<Runtime>::transact(transaction).into(),
+            pallet_ethereum::Call::<Runtime>::transact{ transaction }.into(),
         );
         let encoded = extrinsic.encode();
         OpaqueExtrinsic::decode(&mut &encoded[..]).expect("Encoded extrinsic is always valid")
@@ -1312,7 +1337,7 @@ impl_runtime_apis! {
 
   impl sp_api::Metadata<Block> for Runtime {
     fn metadata() -> OpaqueMetadata {
-      Runtime::metadata().into()
+			OpaqueMetadata::new(Runtime::metadata().into())
     }
 
 		fn metadata_at_version(version: u32) -> Option<OpaqueMetadata> {
@@ -1351,7 +1376,7 @@ impl_runtime_apis! {
 			tx: <Block as BlockT>::Extrinsic,
 			block_hash: <Block as BlockT>::Hash,
     ) -> TransactionValidity {
-      Executive::validate_transaction(source, tx)
+      Executive::validate_transaction(source, tx, block_hash)
     }
   }
 
@@ -1379,7 +1404,7 @@ impl_runtime_apis! {
         slot_duration: Babe::slot_duration(),
         epoch_length: EpochDuration::get(),  
         c: PRIMARY_PROBABILITY,
-        genesis_authorities: Babe::authorities(),
+        authorities: Babe::authorities().to_vec(),
         randomness: Babe::randomness(),
         allowed_slots: sp_consensus_babe::AllowedSlots::PrimaryAndSecondaryPlainSlots,
       }
@@ -1667,7 +1692,7 @@ impl_runtime_apis! {
       fn extrinsic_filter(
         xts: Vec<<Block as BlockT>::Extrinsic>,
       ) -> Vec<EthereumTransaction> {
-        xts.into_iter().filter_map(|xt| match xt.0.function {
+        xts.into_iter().filter_map(|xt| match xt.function {
           RuntimeCall::Ethereum(pallet_ethereum::Call::transact { transaction }) => Some(transaction),
           _ => None
         }).collect::<Vec<EthereumTransaction>>()
@@ -1687,7 +1712,7 @@ impl_runtime_apis! {
           let _ = Executive::apply_extrinsic(ext);
         }
   
-        Ethereum::on_finalize(System::block_number() + 1);
+        <Ethereum as Hooks<BlockNumber>>::on_finalize(System::block_number() + 1);
   
         (
           pallet_ethereum::CurrentBlock::<Runtime>::get(),
