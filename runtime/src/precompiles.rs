@@ -39,9 +39,9 @@ where
             && code_addr > hash(9)
             && code_addr != context_addr
         {
-            return Some(Err(revert(
-                "cannot be called with DELEGATECALL or CALLCODE",
-            )));
+            return Some(Err(fp_evm::PrecompileFailure::Error{
+                exit_status: fp_evm::ExitError::Other(sp_std::borrow::Cow::Borrowed("cannot be called with DELEGATECALL or CALLCODE")),
+            }));
         };
 
         match handle.code_address() {
