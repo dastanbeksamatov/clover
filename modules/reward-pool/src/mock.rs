@@ -53,7 +53,7 @@ impl frame_system::Config for TestRuntime {
   type RuntimeOrigin = RuntimeOrigin;
   type Index = u64;
   type BlockNumber = BlockNumber;
-  type Call = ();
+  type RuntimeCall = ();
   type Hash = H256;
   type Hashing = ::sp_runtime::traits::BlakeTwo256;
   type AccountId = AccountId;

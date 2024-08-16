@@ -12,8 +12,8 @@ use fc_rpc_core::types::{PendingTransactions, FilterPool};
 use sc_consensus_babe::{Config, Epoch};
 use sc_consensus_babe_rpc::BabeRpcHandler;
 use sc_consensus_epochs::SharedEpochChanges;
-use sc_finality_grandpa::{FinalityProofProvider, SharedVoterState, SharedAuthoritySet, GrandpaJustificationStream};
-use sc_finality_grandpa_rpc::GrandpaRpcHandler;
+use sc_consensus_grandpa::{FinalityProofProvider, SharedVoterState, SharedAuthoritySet, GrandpaJustificationStream};
+use sc_consensus_grandpa_rpc::GrandpaRpcHandler;
 use sp_keystore::SyncCryptoStorePtr;
 pub use sc_rpc::SubscriptionTaskExecutor;
 pub use sc_rpc_api::DenyUnsafe;
@@ -25,6 +25,9 @@ use sp_consensus_babe::BabeApi;
 use sp_transaction_pool::TransactionPool;
 use sc_network::NetworkService;
 use jsonrpc_pubsub::manager::SubscriptionManager;
+use pallet_ethereum::EthereumStorageSchema;
+use fc_rpc::{Eth, OverrideHandle, RuntimeApiStorageOverride, SchemaV1Override, StorageOverride};
+use sc_consensus_manual_seal::{rpc::{ManualSeal, ManualSealApi}};
 
 
 /// Light client extra dependencies.
@@ -106,7 +109,7 @@ pub fn create_full<C, P, SC, B>(
   C::Api: substrate_frame_rpc_system::AccountNonceApi<Block, AccountId, Index>,
   C::Api: pallet_contracts_rpc::ContractsRuntimeApi<Block, AccountId, Balance, BlockNumber>,
   C::Api: pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi<Block, Balance>,
-//  C::Api: fp_rpc::EthereumRuntimeRPCApi<Block>,
+  C::Api: fc_rpc::EthereumRuntimeRPCApi<Block>,
   C::Api: BabeApi<Block>,
   C::Api: BlockBuilder<Block>,
   P: TransactionPool<Block=Block> + 'static,
@@ -167,7 +170,7 @@ pub fn create_full<C, P, SC, B>(
     )
   );
   io.extend_with(
-    sc_finality_grandpa_rpc::GrandpaApi::to_delegate(
+    sc_consensus_grandpa_rpc::GrandpaApi::to_delegate(
       GrandpaRpcHandler::new(
         shared_authority_set.clone(),
         shared_voter_state,
@@ -220,11 +223,18 @@ pub fn create_full<C, P, SC, B>(
  //   ))
  // );
 
-//  io.extend_with(
-//    Web3ApiServer::to_delegate(Web3Api::new(
-//      client.clone(),
-//    ))
-//  );
+  io.extend_with(Eth::<B, C, P, CT, BE, A, CIDP, EC>::new(
+    client.clone(),
+    pool.clone(),
+    clover_runtime::TransactionConverter,
+    network.clone(),
+    pending_transactions.clone(),
+    signers,
+    overrides.clone(),
+    backend,
+    is_authority,
+    max_past_logs,
+  ));
 
   // io.extend_with(
   //   EthPubSubApiServer::to_delegate(EthPubSubApi::new(

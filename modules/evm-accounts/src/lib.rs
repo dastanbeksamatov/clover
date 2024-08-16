@@ -20,9 +20,7 @@ use clover_traits::account::MergeAccount;
 use type_utils::with_transaction_result;
 
 mod default_weight;
-mod mock;
-mod tests;
-
+ 
 pub trait WeightInfo {
 	fn claim_account() -> Weight;
 }

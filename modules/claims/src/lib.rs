@@ -233,6 +233,7 @@ pub mod pallet {
   #[pallet::call]
   impl<T: Config> Pallet<T> {
     /// update the bridge account for the target network
+    /// TODO: proper weights
     #[pallet::call_index(0)]
     #[pallet::weight(T::DbWeight::get().writes(2))]
     #[frame_support::transactional]
@@ -250,6 +251,7 @@ pub mod pallet {
       Ok(().into())
     }
 
+    /// TODO: proper weights
     #[pallet::call_index(1)]
     #[pallet::weight(T::DbWeight::get().writes(2))]
     #[frame_support::transactional]
@@ -266,6 +268,7 @@ pub mod pallet {
       Ok(().into())
     }
 
+    /// TODO: proper weights
     #[pallet::call_index(2)]
     #[pallet::weight(T::DbWeight::get().writes(1))]
     #[frame_support::transactional]
@@ -284,6 +287,7 @@ pub mod pallet {
       Ok(().into())
     }
 
+    /// TODO: proper weights
     #[pallet::call_index(3)]
     #[pallet::weight(T::DbWeight::get().writes(3))]
     #[frame_support::transactional]
@@ -302,6 +306,7 @@ pub mod pallet {
       Ok(().into())
     }
 
+    /// TODO: proper weights
     #[pallet::call_index(4)]
     #[pallet::weight(0)]
     #[frame_support::transactional]
@@ -320,6 +325,7 @@ pub mod pallet {
       Ok(().into())
     }
 
+    /// TODO: proper weights
     #[pallet::call_index(5)]
     #[pallet::weight(T::DbWeight::get().reads_writes(2, 3))]
     #[frame_support::transactional]
@@ -375,7 +381,7 @@ pub mod pallet {
 
   #[pallet::validate_unsigned]
   impl<T: Config> ValidateUnsigned for Pallet<T> {
-    type Call = Call<T>;
+    type Call = Call<T>; 
 
     fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
       if let Call::claim_elastic{ network, dest: account, tx, sig } = call {
@@ -511,14 +517,14 @@ pub mod pallet {
         burn_fee = fee;
       }
 
-      T::Currency::withdraw(
+     let _ = T::Currency::withdraw(
         &who,
         amount,
         WithdrawReasons::TRANSFER,
         ExistenceRequirement::KeepAlive,
       )?;
       if burn_fee > 0u32.into() {
-        T::Currency::deposit_creating(&Self::account_id(), burn_fee);
+        let _ = T::Currency::deposit_creating(&Self::account_id(), burn_fee); 
       }
       Ok(burn_amount)
     }
