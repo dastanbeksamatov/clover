@@ -4,65 +4,52 @@
 use super::*;
 use crate as clover_evm_interop;
 
+use frame_support::derive_impl;
 use frame_support::parameter_types;
-use hex_literal::hex;
 use sp_core::H160;
 use sp_core::H256;
-use sp_runtime::{
-    testing::Header,
-    traits::{BlakeTwo256, IdentityLookup},
-};
+use sp_runtime::traits::{BlakeTwo256, IdentityLookup};
+
 use std::str::FromStr;
+use sp_runtime::BuildStorage;
 
 parameter_types! {
     pub const BlockHashCount: u32 = 250;
 }
+#[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
 impl frame_system::Config for Test {
-    type BaseCallFilter = ();
-    type BlockWeights = ();
-    type BlockLength = ();
     type RuntimeOrigin = RuntimeOrigin;
     type RuntimeCall = RuntimeCall;
-    type Index = u64;
-    type BlockNumber = u64;
     type Hash = H256;
     type Hashing = BlakeTwo256;
     type AccountId = u64;
     type Lookup = IdentityLookup<u64>;
-    type Header = Header;
-    type Event = ();
     type BlockHashCount = BlockHashCount;
-    type DbWeight = ();
-    type Version = ();
     type PalletInfo = PalletInfo;
     type AccountData = pallet_balances::AccountData<u64>;
-    type OnNewAccount = ();
-    type OnKilledAccount = ();
-    type SystemWeightInfo = ();
-    type SS58Prefix = ();
+    type Block = Block;
 }
 
 parameter_types! {
     pub const ExistentialDeposit: u64 = 1;
 }
 
+#[derive_impl(pallet_balances::config_preludes::TestDefaultConfig as pallet_balances::DefaultConfig)]
 impl pallet_balances::Config for Test {
     type Balance = u64;
-    type DustRemoval = ();
-    type Event = ();
+    type RuntimeEvent = RuntimeEvent;
     type ExistentialDeposit = ExistentialDeposit;
+    type DustRemoval = ();
     type AccountStore = System;
-    type WeightInfo = ();
-    type MaxLocks = ();
+    type RuntimeHoldReason = ();
 }
 
 impl Config for Test {
-    type Event = ();
+    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type AddressMapping = AddressMappingHandler;
 }
 
-type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
 
 pub struct AddressMappingHandler;
@@ -76,28 +63,22 @@ impl AddressMapping<u64> for AddressMappingHandler {
             _ => 128u64,
         }
     }
-    fn to_evm_address(_account: &u64) -> Option<sp_core::H160> {
-        None
-    }
 }
 
 frame_support::construct_runtime!(
-  pub enum Test where
-    Block = Block,
-    NodeBlock = Block,
-    UncheckedExtrinsic = UncheckedExtrinsic
+  pub struct Test
   {
-    System: frame_system::{Module, Call, Config, Storage, Event<T>},
-    Balances: pallet_balances::{Module, Call, Storage, Config<T>, Event<T>},
-    CloverEvmInterOp: clover_evm_interop::{Module, Call, Storage, Event<T>, },
+    System: frame_system,
+    Balances: pallet_balances,
+    CloverEvmInterOp: clover_evm_interop,
   }
 );
 
 // This function basically just builds a genesis storage key/value store according to
 // our desired mockup.
 pub fn new_test_ext() -> sp_io::TestExternalities {
-    let mut t = frame_system::GenesisConfig::default()
-        .build_storage::<Test>()
+    let mut t = frame_system::GenesisConfig::<Test>::default()
+        .build_storage()
         .unwrap();
 
     pallet_balances::GenesisConfig::<Test> {

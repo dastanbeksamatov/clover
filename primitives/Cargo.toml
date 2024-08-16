@@ -2,7 +2,7 @@
 name = "clover-primitives"
 authors = ['Clover Network <https://github.com/clover-network>']
 description = "Clover primitives definitions"
-edition = "2018"
+edition = '2021'
 license = 'GPL-3.0'
 homepage = "https://substrate.dev"
 repository = 'https://github.com/clover-network/clover'

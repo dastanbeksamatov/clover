@@ -8,7 +8,7 @@ use clover_runtime::{
 };
 use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
 use sp_consensus_babe::AuthorityId as BabeId;
-use sp_finality_grandpa::AuthorityId as GrandpaId;
+use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_runtime::{traits::{IdentifyAccount, Verify}, Perbill};
 use sc_service::ChainType;
 use hex_literal::hex;
@@ -404,12 +404,6 @@ fn testnet_genesis(
             .map(|k| (k, ENDOWMENT))
             .chain(initial_authorities.iter().map(|x| (x.0.clone(), AUTHOR_BALANCE)))
             .collect(),
-    }),
-    pallet_contracts: Some(ContractsConfig {
-      current_schedule: pallet_contracts::Schedule {
-        enable_println, // this should only be enabled on development chains
-        ..Default::default()
-      },
     }),
     pallet_evm: Some(EVMConfig {
       accounts: endowed_eth_accounts,
