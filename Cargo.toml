@@ -21,6 +21,8 @@ members = [
 parity-scale-codec = { default-features = false, version = "3.0.0" }
 scale-info = { version = "2.5.0", default-features = false, features = ["derive"] }
 enum-iterator = "0.6.0"
+clap = { version = "4.5", features = ["derive", "deprecated"] }
+clap_complete = { version = "4.0.2" }
 serde = { features = ['derive'], version = '1.0.101', default-features = false }
 serde_json = "1.0"
 smallvec = "1.4.1"
@@ -46,6 +48,7 @@ jsonrpc-core = "15.0.0"
 jsonrpc-core-client = "15.0.0"
 jsonrpc-derive = "15.0.0"
 jsonrpc-pubsub = "15.0.1"
+jsonrpsee = "0.24.3"
 
 # local deps
 clover-traits = { path = "./modules/traits", default-features = false }
@@ -66,11 +69,14 @@ pallet-ethereum = { git = "https://github.com/polkadot-evm/frontier.git", branch
 fp-consensus = { git = "https://github.com/polkadot-evm/frontier.git", branch = "stable2407", default-features = false }
 fp-evm = { git = "https://github.com/polkadot-evm/frontier.git", branch = "stable2407", default-features = false }
 fp-rpc = { git = "https://github.com/polkadot-evm/frontier.git", branch = "stable2407", default-features = false }
+fc-api = { git = "https://github.com/polkadot-evm/frontier.git", branch = "stable2407", default-features = false }
+fc-cli = { git = "https://github.com/polkadot-evm/frontier.git", branch = "stable2407", default-features = false }
 fc-consensus = { git = "https://github.com/polkadot-evm/frontier.git", branch = "stable2407", default-features = false }
 fc-db = { git = "https://github.com/polkadot-evm/frontier.git", branch = "stable2407", default-features = false }
 fc-mapping-sync = { git = "https://github.com/polkadot-evm/frontier.git", branch = "stable2407", default-features = false }
 fc-rpc = { git = "https://github.com/polkadot-evm/frontier.git", branch = "stable2407", default-features = false }
 fc-rpc-core = { git = "https://github.com/polkadot-evm/frontier.git", branch = "stable2407", default-features = false }
+fc-storage = { git = "https://github.com/polkadot-evm/frontier.git", branch = "stable2407", default-features = false }
 primitive-types = { version = "0.12.0", default-features = false }
 
 # Substrate
@@ -168,7 +174,9 @@ sc-consensus-grandpa = { git = "https://github.com/paritytech/polkadot-sdk.git",
 sc-consensus-grandpa-rpc = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
 sc-informant = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
 sc-keystore = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
+sc-mixnet = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
 sc-network = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
+sc-network-sync = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
 sc-offchain = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
 sc-rpc = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
 sc-rpc-api = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
@@ -176,3 +184,5 @@ sc-service = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = 
 sc-sync-state-rpc = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
 sc-telemetry = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
 sc-transaction-pool = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
+staging-node-inspect = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407", default-features = false }
+polkadot-sdk = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }

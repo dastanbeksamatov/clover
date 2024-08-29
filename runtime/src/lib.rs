@@ -38,11 +38,10 @@ use sp_std::{marker::PhantomData, prelude::*};
 
 use sp_api::impl_runtime_apis;
 
-use pallet_contracts::weights::WeightInfo;
 use pallet_grandpa::fg_primitives;
 use frame_election_provider_support::{
 	bounds::{ElectionBounds, ElectionBoundsBuilder},
-	onchain, BalancingConfig, ElectionDataProvider, SequentialPhragmen, VoteWeight,
+	onchain, BalancingConfig, SequentialPhragmen, VoteWeight,
 };
 use pallet_grandpa::{AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList};
 pub use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
