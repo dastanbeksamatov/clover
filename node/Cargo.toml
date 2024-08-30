@@ -79,7 +79,6 @@ fc-consensus = { workspace = true }
 fc-storage = { workspace = true }
 fp-consensus = { workspace = true }
 fc-db = { workspace = true }
-fc-cli = { workspace = true }
 fc-rpc-core = { workspace = true }
 fc-mapping-sync = { workspace = true }
 fp-rpc = { workspace = true }
@@ -89,7 +88,6 @@ staging-node-inspect = { optional = true, workspace = true, default-features = t
 
 [build-dependencies]
 clap = { optional = true, workspace = true }
-clap_complete = { optional = true, workspace = true }
 staging-node-inspect = { optional = true, workspace = true, default-features = true }
 polkadot-sdk = { features = ["frame-benchmarking-cli", "sc-cli", "sc-storage-monitor", "substrate-build-script-utils"], optional = true, workspace = true, default-features = true }
 
@@ -102,14 +100,12 @@ sql = [
 rocksdb = [
 	"sc-cli/rocksdb",
 	"sc-service/rocksdb",
-	"fc-cli/rocksdb",
 	"fc-db/rocksdb",
 	"fc-mapping-sync/rocksdb",
 	"fc-rpc/rocksdb",
 ]
 cli = [
 	"clap",
-	"clap_complete",
     "staging-node-inspect",
 	"polkadot-sdk",
 ]

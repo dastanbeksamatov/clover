@@ -1,7 +1,7 @@
 use polkadot_sdk::sc_cli as sc_cli;
 
 use sc_cli::{KeySubcommand, SignCmd, VanityCmd, VerifyCmd};
-use crate::eth::EthConfiguration;
+use fc_cli::FrontierDbCmd;
 
 /// Possible subcommands of the main binary.
 #[derive(Debug, clap::Subcommand)]
@@ -42,7 +42,7 @@ pub enum Subcommand {
   Revert(sc_cli::RevertCmd),
 
 	/// Db meta columns information.
-	FrontierDb(fc_cli::FrontierDbCmd),
+	FrontierDb(FrontierDbCmd),
 }
 
 #[allow(missing_docs)]
@@ -60,7 +60,7 @@ pub struct RunCmd {
   pub manual_seal: bool,
 
   #[command(flatten)]
-	pub eth: EthConfiguration,
+	pub eth: crate::eth::EthConfiguration,
 }
 
 #[derive(Debug, clap::Parser)]
