@@ -1,14 +1,14 @@
 use serde_json::json;
 use sp_core::{Pair, Public, sr25519, U256};
 use clover_runtime::{
-  AccountId, BabeConfig, Balance, AuthorityDiscoveryConfig, BalancesConfig, ContractsConfig, IndicesConfig, GenesisConfig, ImOnlineId,
+  AccountId, BabeConfig, Balance, AuthorityDiscoveryConfig, BalancesConfig, IndicesConfig, RuntimeGenesisConfig, ImOnlineId,
   GrandpaConfig, SessionConfig, SessionKeys, StakingConfig, SudoConfig, SystemConfig, WASM_BINARY,
-  Signature, StakerStatus,
+  Signature, StakerStatus, Block,
   EVMConfig, EthereumConfig, DOLLARS
 };
 use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
 use sp_consensus_babe::AuthorityId as BabeId;
-use sp_finality_grandpa::AuthorityId as GrandpaId;
+use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_runtime::{traits::{IdentifyAccount, Verify}, Perbill};
 use sc_service::ChainType;
 use hex_literal::hex;
@@ -18,12 +18,29 @@ use std::collections::BTreeMap;
 use pallet_evm::GenesisAccount;
 use primitive_types::H160;
 use std::str::FromStr;
+use serde::{Serialize, Deserialize};
+use sc_chain_spec::ChainSpecExtension;
 
 // The URL for the telemetry server.
 const TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
 
+/// Node `ChainSpec` extensions.
+///
+/// Additional parameters for some Substrate core modules,
+/// customizable from the chain spec.
+#[derive(Default, Clone, Serialize, Deserialize, ChainSpecExtension)]
+#[serde(rename_all = "camelCase")]
+pub struct Extensions {
+	/// Block numbers with known hashes.
+	pub fork_blocks: sc_client_api::ForkBlocks<Block>,
+	/// Known bad block hashes.
+	pub bad_blocks: sc_client_api::BadBlocks<Block>,
+	/// The light sync state extension used by the sync-state rpc.
+	pub light_sync_state: sc_sync_state_rpc::LightSyncStateExtension,
+}
+
 /// Specialized `ChainSpec`. This is a specialization of the general Substrate ChainSpec type.
-pub type ChainSpec = sc_service::GenericChainSpec<GenesisConfig>;
+pub type ChainSpec = sc_service::GenericChainSpec<Extensions>;
 
 fn session_keys(
   grandpa: GrandpaId,
@@ -385,14 +402,14 @@ fn testnet_genesis(
   endowed_accounts: Vec<AccountId>,
   _enable_println: bool,
   endowed_eth_accounts: BTreeMap<H160, GenesisAccount>,
-) -> GenesisConfig {
+) -> serde_json::Value {
   let enable_println = true;
 
   const ENDOWMENT: Balance = 1_000 * DOLLARS;
   const STASH: Balance = 100 * DOLLARS;
   const AUTHOR_BALANCE: Balance = 200 * DOLLARS;
 
-  GenesisConfig {
+  RuntimeGenesisConfig {
     frame_system: Some(SystemConfig {
       // Add Wasm runtime to storage.
       code: wasm_binary.to_vec(),
@@ -404,12 +421,6 @@ fn testnet_genesis(
             .map(|k| (k, ENDOWMENT))
             .chain(initial_authorities.iter().map(|x| (x.0.clone(), AUTHOR_BALANCE)))
             .collect(),
-    }),
-    pallet_contracts: Some(ContractsConfig {
-      current_schedule: pallet_contracts::Schedule {
-        enable_println, // this should only be enabled on development chains
-        ..Default::default()
-      },
     }),
     pallet_evm: Some(EVMConfig {
       accounts: endowed_eth_accounts,

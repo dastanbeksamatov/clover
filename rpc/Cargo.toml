@@ -2,7 +2,7 @@
 name = "clover-rpc"
 authors = ['Clover Network <https://github.com/clover-network>']
 version = '0.9.0'
-edition = "2018"
+edition = '2021'
 license = 'GPL-3.0'
 homepage = 'https://clover.finance'
 repository = 'https://github.com/clover-network/clover'
