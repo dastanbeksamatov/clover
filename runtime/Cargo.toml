@@ -25,7 +25,6 @@ fp-rpc = { workspace = true }
 fp-evm = { workspace = true }
 evm-accounts = { workspace = true }
 clover-claims = { workspace = true }
-clover-evm-interop = { workspace = true }
 clover-primitives = { workspace = true }
 
 enum-iterator = { workspace = true }
@@ -89,7 +88,6 @@ frame-benchmarking = { workspace = true }
 default = [ 'std' ]
 std = [
 	"clover-claims/std",
-	"clover-evm-interop/std",
 	'clover-primitives/std',
 	'clover-rpc-runtime-api/std',
 	"evm-accounts/std",

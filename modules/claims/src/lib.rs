@@ -32,18 +32,19 @@ pub mod pallet {
   use super::*;
   use frame_support::{pallet_prelude::{OptionQuery, *}, PalletId};
   use frame_system::pallet_prelude::*;
+  use hex_literal::hex;
 
   pub type BalanceOf<T> =
     <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
   #[pallet::config]
-  pub trait Config: frame_system::Config { 
+  pub trait Config: frame_system::Config {
     type ModuleId: Get<PalletId>;
     type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
     type Currency: Currency<Self::AccountId>;
     type Prefix: Get<&'static [u8]>;
   }
-
+ 
   #[pallet::pallet]
   pub struct Pallet<T>(_);
 
@@ -236,7 +237,6 @@ pub mod pallet {
     /// TODO: proper weights
     #[pallet::call_index(0)]
     #[pallet::weight(T::DbWeight::get().writes(2))]
-    #[frame_support::transactional]
     pub fn set_bridge_account_elastic(
       origin: OriginFor<T>,
       network: BridgeNetworks,
@@ -254,7 +254,6 @@ pub mod pallet {
     /// TODO: proper weights
     #[pallet::call_index(1)]
     #[pallet::weight(T::DbWeight::get().writes(2))]
-    #[frame_support::transactional]
     pub fn set_claim_limit_elastic(
       origin: OriginFor<T>,
       network: BridgeNetworks,
@@ -271,7 +270,6 @@ pub mod pallet {
     /// TODO: proper weights
     #[pallet::call_index(2)]
     #[pallet::weight(T::DbWeight::get().writes(1))]
-    #[frame_support::transactional]
     pub fn set_bridge_fee_elastic(
       origin: OriginFor<T>,
       network: BridgeNetworks,
@@ -290,7 +288,6 @@ pub mod pallet {
     /// TODO: proper weights
     #[pallet::call_index(3)]
     #[pallet::weight(T::DbWeight::get().writes(3))]
-    #[frame_support::transactional]
     pub fn mint_claim_elastic(
       origin: OriginFor<T>,
       network: BridgeNetworks,
@@ -309,7 +306,6 @@ pub mod pallet {
     /// TODO: proper weights
     #[pallet::call_index(4)]
     #[pallet::weight(0)]
-    #[frame_support::transactional]
     pub fn claim_elastic(
       origin: OriginFor<T>,
       network: BridgeNetworks,
@@ -328,7 +324,6 @@ pub mod pallet {
     /// TODO: proper weights
     #[pallet::call_index(5)]
     #[pallet::weight(T::DbWeight::get().reads_writes(2, 3))]
-    #[frame_support::transactional]
     pub fn burn_elastic(
       origin: OriginFor<T>,
       network: BridgeNetworks,
@@ -342,8 +337,8 @@ pub mod pallet {
     }
 
     /// bridge between two clover like chains
+    #[pallet::call_index(6)]
     #[pallet::weight(T::DbWeight::get().writes(3))]
-    #[frame_support::transactional]
     pub fn mint_and_send_claim_elastic(
       origin: OriginFor<T>,
       network: BridgeNetworks,

@@ -14,6 +14,7 @@ serde = { workspace = true, optional = true }
 parity-scale-codec = { workspace = true }
 scale-info = { workspace = true }
 rustc-hex = { workspace = true }
+hex-literal = { workspace = true }
 
 # substrate frame dependencies
 frame-support = { workspace = true }
