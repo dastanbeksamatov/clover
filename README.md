@@ -23,6 +23,12 @@
 ### Built With
 * [Substrate](https://substrate.dev)
 
+### Build
+
+```sh
+cargo build --release --features clover-mainnet # or clover-testnet
+```
+
 <!-- ROADMAP -->
 ## Roadmap
 
