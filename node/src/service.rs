@@ -75,13 +75,8 @@ pub fn new_partial<B>(
   sc_transaction_pool::FullPool<Block, FullClient>,
   (
     (
-      sc_consensus_babe::BabeBlockImport<Block, FullClient,
-        FrontierBlockImport<
-          Block,
-          FullGrandpaBlockImport,
-          FullClient,
-        >>,
-      sc_consensus_grandpa::LinkHalf<Block, FullClient, FullSelectChain>,
+      sc_consensus_babe::BabeBlockImport<Block, FullClient, FullGrandpaBlockImport>,
+      sc_finality_grandpa::LinkHalf<Block, FullClient, FullSelectChain>,
       sc_consensus_babe::BabeLink<Block>,
     ),
     (
@@ -273,9 +268,7 @@ pub async fn new_full_base<N: NetworkBackend<Block, <Block as BlockT>::Hash>>(
   cli: &Cli,
 	mixnet_config: Option<sc_mixnet::Config>,
   with_startup_data: impl FnOnce(
-    &sc_consensus_babe::BabeBlockImport<Block, FullClient,
-      FrontierBlockImport<Block, FullGrandpaBlockImport, FullClient>,
-    >,
+    &sc_consensus_babe::BabeBlockImport<Block, FullClient, FullGrandpaBlockImport>,
     &sc_consensus_babe::BabeLink<Block>,
   )
 ) -> Result<NewFullBase, ServiceError> {
@@ -313,10 +306,10 @@ pub async fn new_full_base<N: NetworkBackend<Block, <Block as BlockT>::Hash>>(
     Arc::clone(&peer_store_handle),
 )); 
 
-  #[cfg(feature = "cli")]
-  config.network.request_response_protocols.push(sc_finality_grandpa_warp_sync::request_response_config_for_chain(
-    &config, task_manager.spawn_handle(), backend.clone(),
-  ));
+  // #[cfg(feature = "cli")]
+  // config.network.request_response_protocols.push(sc_finality_grandpa_warp_sync::request_response_config_for_chain(
+  //   &config, task_manager.spawn_handle(), backend.clone(),
+  // ));
 
 
 
@@ -610,7 +603,8 @@ pub async fn new_full_base<N: NetworkBackend<Block, <Block as BlockT>::Hash>>(
       telemetry.as_ref().map(|x| x.handle()),
     );
 
-    let manual_seal = cli.run.manual_seal;
+    let can_author_with =
+      sp_consensus::CanAuthorWithNativeVersion::new(client.executor().clone());
 
     if manual_seal {
       let authorship_future = sc_consensus_manual_seal::run_manual_seal(
@@ -704,7 +698,7 @@ pub async fn new_full_base<N: NetworkBackend<Block, <Block as BlockT>::Hash>>(
     None
   };
 
-  let grandpa_config = sc_consensus_grandpa::Config {
+  let grandpa_config = sc_finality_grandpa::Config {
     // FIXME #1578 make this available through chainspec
     gossip_duration: Duration::from_millis(333),
     justification_generation_period: GRANDPA_JUSTIFICATION_PERIOD,
@@ -724,7 +718,7 @@ pub async fn new_full_base<N: NetworkBackend<Block, <Block as BlockT>::Hash>>(
     // and vote data availability than the observer. The observer has not
     // been tested extensively yet and having most nodes in a network run it
     // could lead to finality stalls.
-    let grandpa_config = sc_consensus_grandpa::GrandpaParams {
+    let grandpa_config = sc_finality_grandpa::GrandpaParams {
       config: grandpa_config,
       link: grandpa_link,
       network: network.clone(),
@@ -758,7 +752,7 @@ pub async fn new_full_base<N: NetworkBackend<Block, <Block as BlockT>::Hash>>(
 }
 
 /// Builds a new service for a full client.
-pub fn new_full(config: Configuration, cli: &Cli)
+pub fn new_full(config: Configuration)
 -> Result<TaskManager, ServiceError> {
   let mixnet_config = cli.mixnet_params.config(config.role.is_authority());
 	let database_path = config.database.path().map(Path::to_path_buf);
