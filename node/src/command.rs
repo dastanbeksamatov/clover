@@ -78,7 +78,7 @@ pub fn run() -> sc_cli::Result<()> {
       let runner = cli.create_runner(cmd)?;
       runner.async_run(|config| {
         let PartialComponents { client, task_manager, import_queue, .. }
-        = new_partial(&config)?;
+        = new_partial(&config, &cli, &cli.run.eth, None)?;
         Ok((cmd.run(client, import_queue), task_manager))
       })
     }
@@ -86,7 +86,7 @@ pub fn run() -> sc_cli::Result<()> {
       let runner = cli.create_runner(cmd)?;
       runner.async_run(|config| {
         let PartialComponents { client, task_manager, ..}
-        = new_partial(&config)?;
+        = new_partial(&config, &cli, &cli.run.eth, None)?;
         Ok((cmd.run(client, config.database), task_manager))
       })
     }
@@ -95,7 +95,7 @@ pub fn run() -> sc_cli::Result<()> {
       let runner = cli.create_runner(cmd)?;
       runner.async_run(|config| {
         let PartialComponents { client, task_manager, ..}
-        = new_partial(&config)?;
+        = new_partial(&config, &cli, &cli.run.eth, None)?;
         Ok((cmd.run(client, config.chain_spec), task_manager))
       })
     }
@@ -104,7 +104,8 @@ pub fn run() -> sc_cli::Result<()> {
       let runner = cli.create_runner(cmd)?;
 
       runner.async_run(|config| {
-        let PartialComponents{client, import_queue, task_manager, ..} = service::new_partial(&config)?;
+        let PartialComponents{client, import_queue, task_manager, ..} = new_partial(&config, &cli, &cli.run.eth, None)?;
+
         Ok((cmd.run(client, import_queue), task_manager))
       })
     }
@@ -119,15 +120,19 @@ pub fn run() -> sc_cli::Result<()> {
 
       runner.async_run(|config| {
         let PartialComponents { client, task_manager, backend, ..}
-        = service::new_partial(&config)?;
-        Ok((cmd.run(client, backend), task_manager))
+        = new_partial(&config, &cli, &cli.run.eth, None)?;
+        let aux_revert = Box::new(move |client, _, blocks| {
+					sc_consensus_grandpa::revert(client, blocks)?;
+					Ok(())
+				});
+        Ok((cmd.run(client, backend, Some(aux_revert)), task_manager))
       })
     }
     Some(Subcommand::FrontierDb(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.sync_run(|mut config| {
 				let (client, _, _, _, frontier_backend) =
-					service::new_chain_ops(&mut config, &cli.eth)?;
+					service::new_chain_ops(&mut config, &cli)?;
 				let frontier_backend = match frontier_backend {
 					fc_db::Backend::KeyValue(kv) => kv,
 					_ => panic!("Only fc_db::Backend::KeyValue supported"),
