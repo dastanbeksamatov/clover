@@ -65,10 +65,10 @@ pub struct RunCmd {
 
 #[derive(Debug, clap::Parser)]
 pub struct Cli {
-  #[structopt(subcommand)]
+  #[command(subcommand)]
   pub subcommand: Option<Subcommand>,
 
-  #[structopt(flatten)]
+	#[clap(flatten)]
   pub run: RunCmd,
 
   #[allow(missing_docs)]

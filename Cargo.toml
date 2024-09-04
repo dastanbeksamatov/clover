@@ -47,7 +47,7 @@ jsonrpc-core = "15.0.0"
 jsonrpc-core-client = "15.0.0"
 jsonrpc-derive = "15.0.0"
 jsonrpc-pubsub = "15.0.1"
-jsonrpsee = "0.24.3"
+jsonrpsee = "0.23.2"
 
 # local deps
 clover-traits = { path = "./modules/traits", default-features = false }

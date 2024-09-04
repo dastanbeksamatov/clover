@@ -47,16 +47,18 @@ impl SubstrateCli for Cli {
   }
 
   fn load_spec(&self, id: &str) -> Result<Box<dyn sc_service::ChainSpec>, String> {
-    Ok(match id {
-      "dev" => Box::new(chain_spec::development_config()?),
-      "" | "local" => Box::new(chain_spec::local_testnet_config()?),
-      "rose" => Box::new(chain_spec::local_rose_testnet_config()?),
-      "iris" => Box::new(chain_spec::iris_testnet_config()?),
-      "ivy" => Box::new(chain_spec::ivy_config()?),
+    let spec = match id {
+      "dev" => Box::new(chain_spec::development_config()),
+      "" | "local" => Box::new(chain_spec::local_testnet_config()),
+      "rose" => Box::new(chain_spec::local_rose_testnet_config()),
+      "iris" => Box::new(chain_spec::iris_testnet_config()),
+      "ivy" => Box::new(chain_spec::ivy_config()),
       path => Box::new(chain_spec::ChainSpec::from_json_file(
         std::path::PathBuf::from(path),
-      )?),
-    })
+      ).map_err(|err| format!("Failed to load chain spec: {}", err))?),
+    };
+
+    Ok(spec)
   }
 }
 
@@ -78,7 +80,7 @@ pub fn run() -> sc_cli::Result<()> {
       let runner = cli.create_runner(cmd)?;
       runner.async_run(|config| {
         let PartialComponents { client, task_manager, import_queue, .. }
-        = new_partial(&config, &cli, &cli.run.eth, None)?;
+        = new_partial(&config, &cli)?;
         Ok((cmd.run(client, import_queue), task_manager))
       })
     }
@@ -86,7 +88,7 @@ pub fn run() -> sc_cli::Result<()> {
       let runner = cli.create_runner(cmd)?;
       runner.async_run(|config| {
         let PartialComponents { client, task_manager, ..}
-        = new_partial(&config, &cli, &cli.run.eth, None)?;
+        = new_partial(&config, &cli)?;
         Ok((cmd.run(client, config.database), task_manager))
       })
     }
@@ -95,7 +97,7 @@ pub fn run() -> sc_cli::Result<()> {
       let runner = cli.create_runner(cmd)?;
       runner.async_run(|config| {
         let PartialComponents { client, task_manager, ..}
-        = new_partial(&config, &cli, &cli.run.eth, None)?;
+        = new_partial(&config, &cli)?;
         Ok((cmd.run(client, config.chain_spec), task_manager))
       })
     }
@@ -104,7 +106,7 @@ pub fn run() -> sc_cli::Result<()> {
       let runner = cli.create_runner(cmd)?;
 
       runner.async_run(|config| {
-        let PartialComponents{client, import_queue, task_manager, ..} = new_partial(&config, &cli, &cli.run.eth, None)?;
+        let PartialComponents{client, import_queue, task_manager, ..} = new_partial(&config, &cli,)?;
 
         Ok((cmd.run(client, import_queue), task_manager))
       })
@@ -120,7 +122,7 @@ pub fn run() -> sc_cli::Result<()> {
 
       runner.async_run(|config| {
         let PartialComponents { client, task_manager, backend, ..}
-        = new_partial(&config, &cli, &cli.run.eth, None)?;
+        = new_partial(&config, &cli)?;
         let aux_revert = Box::new(move |client, _, blocks| {
 					sc_consensus_grandpa::revert(client, blocks)?;
 					Ok(())
@@ -143,7 +145,7 @@ pub fn run() -> sc_cli::Result<()> {
     None => {
 			let runner = cli.create_runner(&cli.run)?;
 			runner.run_node_until_exit(|config| async move {
-				service::new_full(config, &cli).map_err(sc_cli::Error::Service)
+				service::new_full(config, &cli).await.map_err(sc_cli::Error::Service)
 			})
     }
   }

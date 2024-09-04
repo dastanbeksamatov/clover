@@ -126,27 +126,22 @@ where
 {
 }
 
-pub async fn spawn_frontier_tasks<B, RA, HF>(
+pub async fn spawn_frontier_tasks(
 	task_manager: &TaskManager,
-	client: Arc<TFullClient<B, RA, HF>>,
-	backend: Arc<TFullBackend<B>>,
-	frontier_backend: Arc<FrontierBackend<B, TFullClient<B, RA, HF>>>,
+	client: Arc<FullClient>,
+	backend: Arc<FullBackend>,
+	frontier_backend: Arc<FrontierBackend<clover_primitives::Block, FullClient>>,
 	filter_pool: Option<FilterPool>,
-	storage_override: Arc<dyn StorageOverride<B>>,
+	storage_override: Arc<dyn StorageOverride<clover_primitives::Block>>,
 	fee_history_cache: FeeHistoryCache,
 	fee_history_cache_limit: FeeHistoryCacheLimit,
-	sync: Arc<SyncingService<B>>,
+	sync: Arc<SyncingService<clover_primitives::Block>>,
 	pubsub_notification_sinks: Arc<
 		fc_mapping_sync::EthereumBlockNotificationSinks<
-			fc_mapping_sync::EthereumBlockNotification<B>,
+			fc_mapping_sync::EthereumBlockNotification<clover_primitives::Block>,
 		>,
 	>,
-) where
-	B: BlockT<Hash = H256>,
-	RA: ConstructRuntimeApi<B, TFullClient<B, RA, HF>>,
-	RA: Send + Sync + 'static,
-	RA::RuntimeApi: EthCompatRuntimeApiCollection<B>,
-	HF: HostFunctions + 'static,
+)
 {
 	// Spawn main mapping sync worker background task.
 	match &*frontier_backend {

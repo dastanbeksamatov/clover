@@ -21,6 +21,7 @@ use sc_consensus_babe::{BabeConfiguration, Epoch};
 use sc_consensus_epochs::SharedEpochChanges;
 use sc_consensus_grandpa::{FinalityProofProvider, SharedVoterState, SharedAuthoritySet, GrandpaJustificationStream};
 use sc_transaction_pool::ChainApi;
+use sp_core::H256;
 use sp_inherents::CreateInherentDataProviders;
 use sp_keystore::KeystorePtr;
 pub use sc_rpc::SubscriptionTaskExecutor;
@@ -33,12 +34,11 @@ use sp_consensus_babe::BabeApi;
 use sc_service::TransactionPool;
 use sc_network::{service::traits::NetworkService};
 use jsonrpc_pubsub::manager::SubscriptionManager;
-use fp_storage::EthereumStorageSchema;
-use fc_rpc::{Eth, RuntimeApiStorageOverride, StorageOverride};
 use sc_consensus_manual_seal::{rpc::ManualSeal};
 use sp_runtime::traits::Block as BlockT;
+use sc_consensus_manual_seal::rpc::ManualSealApiServer;
 
-use crate::rpc::eth::create_eth;
+use crate::{rpc::eth::create_eth, service::FullFrontierBackend};
 
 use self::eth::EthDeps;
 
@@ -82,78 +82,71 @@ pub struct FullDeps<C, P, SC, B, A: ChainApi, CT, CIDP> {
   pub babe: Option<BabeDeps>,
   /// GRANDPA specific dependencies.
   pub grandpa: GrandpaDeps<B>,
-  /// Backend.
-	pub backend: Arc<fc_db::Backend<Block, FullClient>>,
+	/// The backend used by the node.
+	pub backend: Arc<B>,
   /// Maximum number of logs in a query.
 	pub max_past_logs: u32,
   /// The Node authority flag
   pub is_authority: bool,
   /// Network service
-  pub network: Arc<NetworkService>,
+  pub network: Arc<dyn NetworkService>,
   /// Manual seal command sink
   pub command_sink: Option<futures::channel::mpsc::Sender<sc_consensus_manual_seal::rpc::EngineCommand<Hash>>>,
   /// Eth deps
-  pub eth: EthDeps<B, C, P, A, CT, CIDP>, 
+  pub eth: EthDeps<A, CT, CIDP>, 
 }
 
 pub struct DefaultEthConfig<C, BE>(std::marker::PhantomData<(C, BE)>);
 
-impl<B, C, BE> fc_rpc::EthConfig<B, C> for DefaultEthConfig<C, BE>
+impl<C, BE> fc_rpc::EthConfig<Block, C> for DefaultEthConfig<C, BE>
 where
-	B: BlockT,
-	C: StorageProvider<B, BE> + Sync + Send + 'static,
-	BE: Backend<B> + 'static,
+	C: StorageProvider<Block, BE> + Sync + Send + 'static,
+	BE: Backend<Block> + sc_client_api::Backend<Block> + 'static,
 {
 	type EstimateGasAdapter = ();
 	type RuntimeStorageOverride =
-		fc_rpc::frontier_backend_client::SystemAccountId20StorageOverride<B, C, BE>;
+		fc_rpc::frontier_backend_client::SystemAccountId20StorageOverride<Block, C, BE>;
 }
 
-/// A IO handler that uses all Full RPC extensions.
-pub type IoHandler = jsonrpc_core::IoHandler<sp_api::Metadata>; 
-
 /// Instantiate all Full RPC extensions.
-pub fn create_full<C, P, SC, B, CIDP, CT, A, BE>(
+pub fn create_full<C, P, SC, B, CIDP, CT, A>(
   deps: FullDeps<C, P, SC, B, A, CT, CIDP>,
   subscription_task_executor: SubscriptionTaskExecutor,
   pubsub_notification_sinks: Arc<
     fc_mapping_sync::EthereumBlockNotificationSinks<
-        fc_mapping_sync::EthereumBlockNotification<B>,
+        fc_mapping_sync::EthereumBlockNotification<Block>,
     >
   >,
-) -> Result<RpcModule<()>, Box<dyn std::error::Error + Send + Sync>> where
+) -> Result<RpcModule<()>, Box<dyn std::error::Error + Send + Sync>>
+where
   C: ProvideRuntimeApi<Block> + sc_client_api::backend::StorageProvider<Block, B> + sc_client_api::AuxStore,
   C: sc_client_api::client::BlockchainEvents<Block>,
   C: HeaderBackend<Block> + HeaderMetadata<Block, Error=BlockChainError> + 'static,
   C: Send + Sync + 'static,
   C::Api: substrate_frame_rpc_system::AccountNonceApi<Block, AccountId, Index>,
-  C::Api: ContractsApi<Block, AccountId, Balance, BlockNumber>,
+  // C::Api: ContractsApi<Block, AccountId, Balance, BlockNumber, Hash, EventRecord>,
   C::Api: pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi<Block, Balance>,
   C::Api: EthereumRuntimeRPCApi<Block>,
   C::Api: BabeApi<Block>,
   C::Api: BlockBuilder<Block>,
-  P: TransactionPool<Block=Block> + 'static,
+  P: TransactionPool<Block=Block> + 'static, 
   SC: SelectChain<Block> +'static, 
   B: sc_client_api::Backend<Block> + Send + Sync + 'static,
   B::State: sc_client_api::StateBackend<sp_runtime::traits::HashingFor<Block>>,
-  BE: Backend<Block> + 'static,
-  P: TransactionPool<Block = B> + 'static,
-  CIDP: CreateInherentDataProviders<B, ()> + Send + 'static,
-  CT: fp_rpc::ConvertTransaction<<B as BlockT>::Extrinsic> + Send + Sync + 'static,
+  P: TransactionPool<Block = Block> + 'static,
+  CIDP: CreateInherentDataProviders<Block, ()> + Send + 'static,
+  CT: fp_rpc::ConvertTransaction<<Block as BlockT>::Extrinsic> + Send + Sync + 'static,
   A: ChainApi,
 {
-	use fc_rpc::{
-		pending::AuraConsensusDataProvider, Debug, DebugApiServer, Eth, EthApiServer, EthDevSigner,
+	use fc_rpc::{Debug, DebugApiServer, Eth, EthApiServer, EthDevSigner,
 		EthFilter, EthFilterApiServer, EthPubSub, EthPubSubApiServer, EthSigner, Net, NetApiServer,
-		Web3, Web3ApiServer,
+		Web3,
 	};
 	use pallet_transaction_payment_rpc::{TransactionPayment, TransactionPaymentApiServer};
 	use sc_consensus_babe_rpc::{Babe, BabeApiServer};
 	use sc_consensus_grandpa_rpc::{Grandpa, GrandpaApiServer};
 	use sc_rpc::{
 		dev::{Dev, DevApiServer},
-		mixnet::MixnetApiServer,
-		statement::StatementApiServer,
 	};
 	use sc_sync_state_rpc::{SyncState, SyncStateApiServer};
 	use substrate_frame_rpc_system::{System, SystemApiServer};
@@ -184,9 +177,7 @@ pub fn create_full<C, P, SC, B, CIDP, CT, A, BE>(
     finality_provider,
   } = grandpa; 
 
-  io.merge(
-    System::new(client.clone(), pool.clone(), deny_unsafe)
-  );
+  io.merge(System::new(client.clone(), pool.clone(), deny_unsafe).into_rpc())?;
 	io.merge(TransactionPayment::new(client.clone()).into_rpc())?;
 
   // io.merge(ContractsApi::to_delegate(Contracts::new(client.clone())));
@@ -212,22 +203,22 @@ pub fn create_full<C, P, SC, B, CIDP, CT, A, BE>(
 		)
 		.into_rpc(),
 	)?;
-
-  let io = create_eth::<_, _, _, _, _, _, _, DefaultEthConfig<C, BE>>(
-      io,
-      eth,
-      subscription_task_executor,
-      pubsub_notification_sinks,
-  )?; 
  
   // The final RPC extension receives commands for the manual seal consensus engine.
   if let Some(command_sink) = command_sink {
     io.merge(
       // We provide the rpc handler with the sending end of the channel to allow the rpc
       // send EngineCommands to the background block authorship task.
-      ManualSeal::new(command_sink),
-    );
+      ManualSeal::new(command_sink).into_rpc(),
+    )?;
   }
+
+  let io = create_eth::<_, _, _, DefaultEthConfig<FullClient, FullFrontierBackend>>(
+      io,
+      eth,
+      subscription_task_executor,
+      pubsub_notification_sinks,
+  )?;
 
   Ok(io)
 }
