@@ -190,7 +190,7 @@ pub fn new_partial(
 
 	let slot_duration = babe_link.config().slot_duration();
 
-  let (import_queue, babe_worker_handle) = if manual_seal {
+  let (import_queue, babe_worker_handle) = if cli.run.manual_seal {
     (sc_consensus_manual_seal::import_queue(
       Box::new(frontier_block_import.clone()),
       &task_manager.spawn_essential_handle(),

@@ -11,7 +11,7 @@ use sc_client_api::{
 use sc_network::service::traits::NetworkService;
 use sc_network_sync::SyncingService;
 use sc_rpc::SubscriptionTaskExecutor;
-use sc_transaction_pool::{ChainApi, Pool};
+use sc_transaction_pool::{ChainApi, FullChainApi, Pool};
 use sp_api::{CallApiAt, ProvideRuntimeApi};
 use sp_block_builder::BlockBuilder as BlockBuilderApi;
 use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
@@ -26,13 +26,13 @@ use fp_rpc::{ConvertTransaction, ConvertTransactionRuntimeApi, EthereumRuntimeRP
 use crate::service::{FullBackend, FullClient, TransactionPool};
 
 /// Extra dependencies for Ethereum compatibility.
-pub struct EthDeps<A: ChainApi, CT, CIDP> {
+pub struct EthDeps<CT, CIDP> {
 	/// The client instance to use.
 	pub client: Arc<FullClient>,
 	/// Transaction pool instance.
 	pub pool: Arc<TransactionPool>,
 	/// Graph pool instance.
-	pub graph: Arc<Pool<A>>,
+	pub graph: Arc<Pool<FullChainApi<FullClient, Block>>>,
 	/// Ethereum transaction converter.
 	pub converter: Option<CT>,
 	/// The Node authority flag
@@ -67,9 +67,9 @@ pub struct EthDeps<A: ChainApi, CT, CIDP> {
 }
 
 /// Instantiate Ethereum-compatible RPC extensions.
-pub fn create_eth<A, CT, CIDP, EC>(
+pub fn create_eth<CT, CIDP, EC>(
 	mut io: RpcModule<()>,
-	deps: EthDeps<A, CT, CIDP>,
+	deps: EthDeps<CT, CIDP>,
 	subscription_task_executor: SubscriptionTaskExecutor,
 	pubsub_notification_sinks: Arc<
 		fc_mapping_sync::EthereumBlockNotificationSinks<
@@ -78,7 +78,6 @@ pub fn create_eth<A, CT, CIDP, EC>(
 	>,
 ) -> Result<RpcModule<()>, Box<dyn std::error::Error + Send + Sync>>
 where
-	A: ChainApi + 'static,
 	CT: ConvertTransaction<<Block as BlockT>::Extrinsic> + Send + Sync + 'static,
 	CIDP: CreateInherentDataProviders<Block, ()> + Send + 'static,
 	EC: EthConfig<Block, FullClient>,
@@ -117,7 +116,7 @@ where
 	}
 
 	io.merge(
-		Eth::<Block, FullClient, TransactionPool, CT, FullBackend, A, CIDP, EC>::new(
+		Eth::<Block, FullClient, TransactionPool, CT, FullBackend, FullChainApi<FullClient, Block>, CIDP, EC>::new(
 			client.clone(),
 			pool.clone(),
 			graph.clone(),

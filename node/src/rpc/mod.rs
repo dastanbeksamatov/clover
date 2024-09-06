@@ -20,6 +20,7 @@ use sc_network_sync::SyncingService;
 use sc_consensus_babe::{BabeConfiguration, Epoch};
 use sc_consensus_epochs::SharedEpochChanges;
 use sc_consensus_grandpa::{FinalityProofProvider, SharedVoterState, SharedAuthoritySet, GrandpaJustificationStream};
+use sc_service::TransactionPool;
 use sc_transaction_pool::ChainApi;
 use sp_core::H256;
 use sp_inherents::CreateInherentDataProviders;
@@ -31,10 +32,9 @@ use sp_block_builder::BlockBuilder;
 use sp_blockchain::{Error as BlockChainError, HeaderMetadata, HeaderBackend};
 use sp_consensus::SelectChain;
 use sp_consensus_babe::BabeApi;
-use sc_service::TransactionPool;
-use sc_network::{service::traits::NetworkService};
+use sc_network::service::traits::NetworkService;
 use jsonrpc_pubsub::manager::SubscriptionManager;
-use sc_consensus_manual_seal::{rpc::ManualSeal};
+use sc_consensus_manual_seal::rpc::ManualSeal;
 use sp_runtime::traits::Block as BlockT;
 use sc_consensus_manual_seal::rpc::ManualSealApiServer;
 
@@ -67,7 +67,7 @@ pub struct GrandpaDeps<B> {
 }
 
 /// Full client dependencies.
-pub struct FullDeps<C, P, SC, B, A: ChainApi, CT, CIDP> {
+pub struct FullDeps<C, P, SC, B, CT, CIDP> {
   /// The client instance to use.
   pub client: Arc<C>,
   /// Transaction pool instance.
@@ -93,7 +93,7 @@ pub struct FullDeps<C, P, SC, B, A: ChainApi, CT, CIDP> {
   /// Manual seal command sink
   pub command_sink: Option<futures::channel::mpsc::Sender<sc_consensus_manual_seal::rpc::EngineCommand<Hash>>>,
   /// Eth deps
-  pub eth: EthDeps<A, CT, CIDP>, 
+  pub eth: EthDeps<CT, CIDP>, 
 }
 
 pub struct DefaultEthConfig<C, BE>(std::marker::PhantomData<(C, BE)>);
@@ -109,8 +109,8 @@ where
 }
 
 /// Instantiate all Full RPC extensions.
-pub fn create_full<C, P, SC, B, CIDP, CT, A>(
-  deps: FullDeps<C, P, SC, B, A, CT, CIDP>,
+pub fn create_full<P, SC, CIDP, CT>(
+  deps: FullDeps<FullClient, P, SC, FullFrontierBackend, CT, CIDP>,
   subscription_task_executor: SubscriptionTaskExecutor,
   pubsub_notification_sinks: Arc<
     fc_mapping_sync::EthereumBlockNotificationSinks<
@@ -119,24 +119,10 @@ pub fn create_full<C, P, SC, B, CIDP, CT, A>(
   >,
 ) -> Result<RpcModule<()>, Box<dyn std::error::Error + Send + Sync>>
 where
-  C: ProvideRuntimeApi<Block> + sc_client_api::backend::StorageProvider<Block, B> + sc_client_api::AuxStore,
-  C: sc_client_api::client::BlockchainEvents<Block>,
-  C: HeaderBackend<Block> + HeaderMetadata<Block, Error=BlockChainError> + 'static,
-  C: Send + Sync + 'static,
-  C::Api: substrate_frame_rpc_system::AccountNonceApi<Block, AccountId, Index>,
-  // C::Api: ContractsApi<Block, AccountId, Balance, BlockNumber, Hash, EventRecord>,
-  C::Api: pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi<Block, Balance>,
-  C::Api: EthereumRuntimeRPCApi<Block>,
-  C::Api: BabeApi<Block>,
-  C::Api: BlockBuilder<Block>,
-  P: TransactionPool<Block=Block> + 'static, 
-  SC: SelectChain<Block> +'static, 
-  B: sc_client_api::Backend<Block> + Send + Sync + 'static,
-  B::State: sc_client_api::StateBackend<sp_runtime::traits::HashingFor<Block>>,
   P: TransactionPool<Block = Block> + 'static,
+  SC: SelectChain<Block> +'static, 
   CIDP: CreateInherentDataProviders<Block, ()> + Send + 'static,
   CT: fp_rpc::ConvertTransaction<<Block as BlockT>::Extrinsic> + Send + Sync + 'static,
-  A: ChainApi,
 {
 	use fc_rpc::{Debug, DebugApiServer, Eth, EthApiServer, EthDevSigner,
 		EthFilter, EthFilterApiServer, EthPubSub, EthPubSubApiServer, EthSigner, Net, NetApiServer,
@@ -145,9 +131,7 @@ where
 	use pallet_transaction_payment_rpc::{TransactionPayment, TransactionPaymentApiServer};
 	use sc_consensus_babe_rpc::{Babe, BabeApiServer};
 	use sc_consensus_grandpa_rpc::{Grandpa, GrandpaApiServer};
-	use sc_rpc::{
-		dev::{Dev, DevApiServer},
-	};
+	use sc_rpc::dev::{Dev, DevApiServer};
 	use sc_sync_state_rpc::{SyncState, SyncStateApiServer};
 	use substrate_frame_rpc_system::{System, SystemApiServer};
 
@@ -213,7 +197,7 @@ where
     )?;
   }
 
-  let io = create_eth::<_, _, _, DefaultEthConfig<FullClient, FullFrontierBackend>>(
+  let io = create_eth::<_, _, DefaultEthConfig<FullClient, FullFrontierBackend>>(
       io,
       eth,
       subscription_task_executor,

@@ -1888,4 +1888,12 @@ impl_runtime_apis! {
         Executive::initialize_block(header);
       }
     }
+    
+    impl fp_rpc::ConvertTransactionRuntimeApi<Block> for Runtime {
+      fn convert_transaction(transaction: EthereumTransaction) -> <Block as BlockT>::Extrinsic {
+        UncheckedExtrinsic::new_unsigned(
+          pallet_ethereum::Call::<Runtime>::transact { transaction }.into(),
+        )
+      }
+    }
 }
