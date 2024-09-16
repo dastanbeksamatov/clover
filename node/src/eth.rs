@@ -125,23 +125,28 @@ where
 		+ fp_rpc::EthereumRuntimeRPCApi<Block>,
 {
 }
-
-pub async fn spawn_frontier_tasks(
+ 
+pub async fn spawn_frontier_tasks<B, RA, HF>(
 	task_manager: &TaskManager,
-	client: Arc<FullClient>,
-	backend: Arc<FullBackend>,
-	frontier_backend: Arc<FrontierBackend<clover_primitives::Block, FullClient>>,
+	client: Arc<FullClient<B, RA, HF>>,
+	backend: Arc<FullBackend<B>>,
+	frontier_backend: Arc<FrontierBackend<B, FullClient<B, RA, HF>>>,
 	filter_pool: Option<FilterPool>,
-	storage_override: Arc<dyn StorageOverride<clover_primitives::Block>>,
+	storage_override: Arc<dyn StorageOverride<B>>,
 	fee_history_cache: FeeHistoryCache,
 	fee_history_cache_limit: FeeHistoryCacheLimit,
-	sync: Arc<SyncingService<clover_primitives::Block>>,
+	sync: Arc<SyncingService<B>>,
 	pubsub_notification_sinks: Arc<
 		fc_mapping_sync::EthereumBlockNotificationSinks<
-			fc_mapping_sync::EthereumBlockNotification<clover_primitives::Block>,
+			fc_mapping_sync::EthereumBlockNotification<B>,
 		>,
 	>,
-)
+) where 
+	B: BlockT<Hash = H256>,
+	RA: ConstructRuntimeApi<B, FullClient<B, RA, HF>>,
+	RA: Send + Sync + 'static,
+	RA::RuntimeApi: EthCompatRuntimeApiCollection<B>,
+	HF: HostFunctions + 'static,
 {
 	// Spawn main mapping sync worker background task.
 	match &*frontier_backend {

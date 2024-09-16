@@ -7,15 +7,15 @@
 use std::sync::Arc;
 
 use std::collections::BTreeMap;
-use clover_primitives::{Block, BlockNumber, AccountId, Index, Balance, Hash, };
-use fc_api::Backend;
-use fc_rpc_core::types::{FilterPool};
-use fc_rpc::{EthBlockDataCacheTask};
+use clover_primitives::{BlockNumber, AccountId, Index, Balance, Hash};
+use sc_client_api::Backend;
+use fc_rpc_core::types::FilterPool;
+use fc_rpc::EthBlockDataCacheTask;
 use fp_rpc::EthereumRuntimeRPCApi;
 use jsonrpsee::RpcModule;
 use pallet_contracts::ContractsApi;
 use polkadot_sdk::polkadot_service::FullClient;
-use sc_client_api::StorageProvider;
+use sc_client_api::{AuxStore, BlockchainEvents, StorageProvider, UsageProvider};
 use sc_network_sync::SyncingService;
 use sc_consensus_babe::{BabeConfiguration, Epoch};
 use sc_consensus_epochs::SharedEpochChanges;
@@ -27,7 +27,7 @@ use sp_inherents::CreateInherentDataProviders;
 use sp_keystore::KeystorePtr;
 pub use sc_rpc::SubscriptionTaskExecutor;
 pub use sc_rpc_api::DenyUnsafe;
-use sp_api::ProvideRuntimeApi;
+use sp_api::{CallApiAt, ProvideRuntimeApi};
 use sp_block_builder::BlockBuilder;
 use sp_blockchain::{Error as BlockChainError, HeaderMetadata, HeaderBackend};
 use sp_consensus::SelectChain;
@@ -35,39 +35,39 @@ use sp_consensus_babe::BabeApi;
 use sc_network::service::traits::NetworkService;
 use jsonrpc_pubsub::manager::SubscriptionManager;
 use sc_consensus_manual_seal::rpc::ManualSeal;
-use sp_runtime::traits::Block as BlockT;
+use sp_runtime::traits::{Block as BlockT, Header, NumberFor};
 use sc_consensus_manual_seal::rpc::ManualSealApiServer;
 
-use crate::{rpc::eth::create_eth, service::FullFrontierBackend};
+use crate::{rpc::eth::create_eth, service::{FullBackend, FullFrontierBackend}};
 
 use self::eth::EthDeps;
 
 pub mod eth;
 
 /// Extra dependencies for BABE. 
-pub struct BabeDeps {
+pub struct BabeDeps<B: BlockT> {
   /// The keystore that manages the keys of the node.
   pub keystore: KeystorePtr,
 	/// A handle to the BABE worker for issuing requests.
-	pub babe_worker_handle: sc_consensus_babe::BabeWorkerHandle<Block>,
+	pub babe_worker_handle: sc_consensus_babe::BabeWorkerHandle<B>,
 }
 
 /// Extra dependencies for GRANDPA
-pub struct GrandpaDeps<B> {
+pub struct GrandpaDeps<B: BlockT, BE> {
   /// Voting round info.
   pub shared_voter_state: SharedVoterState,
   /// Authority set info.
-  pub shared_authority_set: SharedAuthoritySet<Hash, BlockNumber>,
+  pub shared_authority_set: SharedAuthoritySet<B::Hash, NumberFor<B>>,
   /// Receives notifications about justification events from Grandpa.
-  pub justification_stream: GrandpaJustificationStream<Block>,
+  pub justification_stream: GrandpaJustificationStream<B>,
   /// Subscription manager to keep track of pubsub subscribers.
   pub subscription_executor: SubscriptionTaskExecutor,
   /// Finality proof provider.
-  pub finality_provider: Arc<FinalityProofProvider<B, Block>>,
+  pub finality_provider: Arc<FinalityProofProvider<BE, B>>,
 }
 
 /// Full client dependencies.
-pub struct FullDeps<C, P, SC, B, CT, CIDP> {
+pub struct FullDeps<B: BlockT, C, P, A: ChainApi, SC, BE, CT, CIDP> {
   /// The client instance to use.
   pub client: Arc<C>,
   /// Transaction pool instance.
@@ -79,11 +79,11 @@ pub struct FullDeps<C, P, SC, B, CT, CIDP> {
   /// Whether to deny unsafe calls
   pub deny_unsafe: DenyUnsafe,
   /// BABE specific dependencies.
-  pub babe: Option<BabeDeps>,
+  pub babe: Option<BabeDeps<B>>,
   /// GRANDPA specific dependencies.
-  pub grandpa: GrandpaDeps<B>,
+  pub grandpa: GrandpaDeps<B, BE>,
 	/// The backend used by the node.
-	pub backend: Arc<B>,
+	pub backend: Arc<BE>,
   /// Maximum number of logs in a query.
 	pub max_past_logs: u32,
   /// The Node authority flag
@@ -93,36 +93,51 @@ pub struct FullDeps<C, P, SC, B, CT, CIDP> {
   /// Manual seal command sink
   pub command_sink: Option<futures::channel::mpsc::Sender<sc_consensus_manual_seal::rpc::EngineCommand<Hash>>>,
   /// Eth deps
-  pub eth: EthDeps<CT, CIDP>, 
+  pub eth: EthDeps<B, C, P, A, CT, CIDP>, 
 }
 
 pub struct DefaultEthConfig<C, BE>(std::marker::PhantomData<(C, BE)>);
 
-impl<C, BE> fc_rpc::EthConfig<Block, C> for DefaultEthConfig<C, BE>
+impl<B, C, BE> fc_rpc::EthConfig<B, C> for DefaultEthConfig<C, BE>
 where
-	C: StorageProvider<Block, BE> + Sync + Send + 'static,
-	BE: Backend<Block> + sc_client_api::Backend<Block> + 'static,
+	B: BlockT,
+	C: StorageProvider<B, BE> + Sync + Send + 'static,
+	BE: Backend<B> + 'static,
 {
 	type EstimateGasAdapter = ();
 	type RuntimeStorageOverride =
-		fc_rpc::frontier_backend_client::SystemAccountId20StorageOverride<Block, C, BE>;
+		fc_rpc::frontier_backend_client::SystemAccountId20StorageOverride<B, C, BE>;
 }
 
 /// Instantiate all Full RPC extensions.
-pub fn create_full<P, SC, CIDP, CT>(
-  deps: FullDeps<FullClient, P, SC, FullFrontierBackend, CT, CIDP>,
+pub fn create_full<B, C, P, SC, BE, A, CT, CIDP>(
+  deps: FullDeps<B, C, P, A, SC, BE, CT, CIDP>,
   subscription_task_executor: SubscriptionTaskExecutor,
   pubsub_notification_sinks: Arc<
     fc_mapping_sync::EthereumBlockNotificationSinks<
-        fc_mapping_sync::EthereumBlockNotification<Block>,
-    >
+        fc_mapping_sync::EthereumBlockNotification<B>,
+    > 
   >,
 ) -> Result<RpcModule<()>, Box<dyn std::error::Error + Send + Sync>>
 where
-  P: TransactionPool<Block = Block> + 'static,
-  SC: SelectChain<Block> +'static, 
-  CIDP: CreateInherentDataProviders<Block, ()> + Send + 'static,
-  CT: fp_rpc::ConvertTransaction<<Block as BlockT>::Extrinsic> + Send + Sync + 'static,
+  B: BlockT,
+  C: CallApiAt<B> + ProvideRuntimeApi<B>,
+  C::Api: sp_block_builder::BlockBuilder<B>,
+  C::Api: sp_consensus_babe::BabeApi<B>,
+  C::Api: substrate_frame_rpc_system::AccountNonceApi<B, AccountId, Index>,
+  C::Api: pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi<B, Balance>,
+  C::Api: fp_rpc::ConvertTransactionRuntimeApi<B>,
+  C::Api: fp_rpc::EthereumRuntimeRPCApi<B>,
+	C::Api: BabeApi<B>,
+  C: HeaderBackend<B> + HeaderMetadata<B, Error = BlockChainError> + 'static,
+  C: BlockchainEvents<B> + AuxStore + UsageProvider<B> + StorageProvider<B, BE>,
+  SC: SelectChain<B> + 'static,
+  BE: Backend<B> + 'static,
+  BE::State: sc_client_api::backend::StateBackend<sp_runtime::traits::HashingFor<B>>,
+  P: TransactionPool<Block = B> + 'static,
+  A: ChainApi<Block = B> + 'static,
+  CIDP: CreateInherentDataProviders<B, ()> + Send + 'static,
+  CT: fp_rpc::ConvertTransaction<<B as BlockT>::Extrinsic> + Send + Sync + 'static,
 {
 	use fc_rpc::{Debug, DebugApiServer, Eth, EthApiServer, EthDevSigner,
 		EthFilter, EthFilterApiServer, EthPubSub, EthPubSubApiServer, EthSigner, Net, NetApiServer,
@@ -197,11 +212,11 @@ where
     )?;
   }
 
-  let io = create_eth::<_, _, DefaultEthConfig<FullClient, FullFrontierBackend>>(
-      io,
-      eth,
-      subscription_task_executor,
-      pubsub_notification_sinks,
+	let io = create_eth::<_, _, _, _, _, _, _, DefaultEthConfig<C, BE>>(
+     io,
+     eth,
+     subscription_task_executor,
+    pubsub_notification_sinks,
   )?;
 
   Ok(io)

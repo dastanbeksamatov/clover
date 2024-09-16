@@ -1,22 +1,25 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
 use std::{collections::{BTreeMap, HashMap}, path::Path, sync::{Arc, Mutex}, time::Duration};
+use parity_scale_codec::Codec;
 use polkadot_sdk::sc_transaction_pool_api::OffchainTransactionPoolFactory;
 use polkadot_sdk::sc_offchain;
 use sc_client_api::{ExecutorProvider, BlockchainEvents};
 use fc_rpc_core::types::FilterPool;
 use fc_rpc::EthTask;
-use clover_runtime::{self, opaque::Block, RuntimeApi, TransactionConverter};
+use clover_runtime::{self, RuntimeApi, TransactionConverter};
 use sc_consensus::BasicQueue;
 use sc_consensus_babe::{BabeWorkerHandle, SlotProportion};
+use sc_consensus_grandpa::BlockNumberOps;
 use sc_executor::{HostFunctions as HostFunctionsT, WasmExecutor};
 use sc_network::{service::traits::NetworkService, Event, NetworkBackend};
 use sc_network_sync::SyncingService;
 use sc_service::{error::Error as ServiceError, BasePath, Configuration, PartialComponents, RpcHandlers, TaskManager};
+use sp_api::ConstructRuntimeApi;
 use sp_core::H256;
 use sp_inherents::InherentDataProvider;
 use sc_client_api::Backend;
-use sp_runtime::traits::Block as BlockT;
+use sp_runtime::traits::{Block as BlockT, MaybeDisplay, NumberFor, Zero};
 use sc_cli::SubstrateCli;
 use sc_telemetry::{Telemetry, TelemetryConnectionNotifier, TelemetryWorker};
 use fc_mapping_sync::kv::MappingSyncWorker;
@@ -25,7 +28,7 @@ use futures::channel::mpsc::Receiver;
 use futures::StreamExt;
 use futures::prelude::*;
 use sc_consensus_manual_seal::{EngineCommand, ManualSealParams};
-use clover_primitives::Hash;
+use clover_primitives::{Block, Hash, AccountId, Index, Balance};
 pub use crate::eth::{db_config_dir, EthConfiguration};
 use crate::
 	eth::{
@@ -45,58 +48,99 @@ pub type HostFunctions = (
 #[cfg(not(feature = "runtime-benchmarks"))]
 pub type HostFunctions = sp_io::SubstrateHostFunctions;
 
-/// Full backend.
-pub type FullBackend = sc_service::TFullBackend<Block>;
 /// Full frontier backend.
-pub type FullFrontierBackend = fc_db::Backend<Block, FullClient>;
+pub type FullFrontierBackend<B, RA, HF> = fc_db::Backend<B, FullClient<B, RA, HF>>;
 
 /// A specialized `WasmExecutor` intended to use across substrate node. It provides all required
 /// HostFunctions.
 pub type RuntimeExecutor = sc_executor::WasmExecutor<HostFunctions>;
 
 /// The full client type definition.
-pub type FullClient = sc_service::TFullClient<Block, RuntimeApi, RuntimeExecutor>;
-type FullSelectChain = sc_consensus::LongestChain<FullBackend, Block>;
-type FullGrandpaBlockImport =
-  sc_consensus_grandpa::GrandpaBlockImport<FullBackend, Block, FullClient, FullSelectChain>;
-type FullFrontierBlockImport = fc_consensus::FrontierBlockImport<Block, FullGrandpaBlockImport, FullClient>;
+// pub type FullClient = sc_service::TFullClient<Block, RuntimeApi, RuntimeExecutor>;
+/// Full backend.
+pub type FullBackend<B> = sc_service::TFullBackend<B>;
+
+/// Full client.
+pub type FullClient<B, RA, HF> = sc_service::TFullClient<B, RA, WasmExecutor<HF>>;
+type FullSelectChain<B> = sc_consensus::LongestChain<FullBackend<B>, B>;
+
+type FullGrandpaBlockImport<B, RA, HF> =
+  sc_consensus_grandpa::GrandpaBlockImport<FullBackend<B>, B, FullClient<B, RA, HF>, FullSelectChain<B>>;
+type FullFrontierBlockImport<B, RA, HF> = fc_consensus::FrontierBlockImport<B, FullGrandpaBlockImport<B, RA, HF>, FullClient<B, RA, HF>>;
+
+/// A set of APIs that every runtime must implement.
+pub trait BaseRuntimeApiCollection<Block: BlockT>:
+	sp_api::ApiExt<Block>
+	+ sp_api::Metadata<Block>
+	+ sp_block_builder::BlockBuilder<Block>
+	+ sp_offchain::OffchainWorkerApi<Block>
+	+ sp_session::SessionKeys<Block>
+	+ sp_transaction_pool::runtime_api::TaggedTransactionQueue<Block>
+  + sp_authority_discovery::AuthorityDiscoveryApi<Block>
+  + sp_consensus_grandpa::GrandpaApi<Block>
+  + sp_consensus_babe::BabeApi<Block>
+  {
+  }
+
+impl<Block, Api> BaseRuntimeApiCollection<Block> for Api
+where
+	Block: BlockT,
+	Api: sp_api::ApiExt<Block>
+		+ sp_api::Metadata<Block>
+		+ sp_block_builder::BlockBuilder<Block>
+		+ sp_offchain::OffchainWorkerApi<Block>
+		+ sp_session::SessionKeys<Block>
+		+ sp_transaction_pool::runtime_api::TaggedTransactionQueue<Block>
+    + sp_authority_discovery::AuthorityDiscoveryApi<Block>
+  + sp_consensus_grandpa::GrandpaApi<Block>
+  + sp_consensus_babe::BabeApi<Block>
+{
+}
+
 
 /// The transaction pool type definition.
-pub type TransactionPool = sc_transaction_pool::FullPool<Block, FullClient>;
+pub type TransactionPool<B, RA, HF> = sc_transaction_pool::FullPool<B, FullClient<B, RA, HF>>;
 
 /// The minimum period of blocks on which justifications will be
 /// imported and generated.
 const GRANDPA_JUSTIFICATION_PERIOD: u32 = 512;
 
-pub fn new_partial(
+pub fn new_partial<B, RA, HF>(
   config: &Configuration,
   cli: &Cli,
 ) -> Result<sc_service::PartialComponents<
-  FullClient,
-  FullBackend,
-  FullSelectChain,
-  sc_consensus::DefaultImportQueue<Block>,
-  sc_transaction_pool::FullPool<Block, FullClient>,
+  FullClient<B, RA, HF>,
+  FullBackend<B>,
+  FullSelectChain<B>,
+  sc_consensus::DefaultImportQueue<B>,
+  sc_transaction_pool::FullPool<B, FullClient<B, RA, HF>>,
   (
     (
-      sc_consensus_babe::BabeBlockImport<Block, FullClient, FullFrontierBlockImport>,
-      sc_consensus_grandpa::LinkHalf<Block, FullClient, FullSelectChain>,
-      sc_consensus_babe::BabeLink<Block>,
+      sc_consensus_babe::BabeBlockImport<B, FullClient<B, RA, HF>, FrontierBlockImport<B, FullGrandpaBlockImport<B, RA, HF>, FullClient<B, RA, HF>>>,
+      sc_consensus_grandpa::LinkHalf<B, FullClient<B, RA, HF>, FullSelectChain<B>>,
+      sc_consensus_babe::BabeLink<B>,
     ),
     (
       Option<FilterPool>,
-      FullFrontierBackend,
+      FullFrontierBackend<B, RA, HF>,
       FrontierBlockImport<
-        Block,
-        FullGrandpaBlockImport,
-        FullClient,
+        B,
+        FullGrandpaBlockImport<B, RA, HF>,
+        FullClient<B, RA, HF>,
       >,
-			Arc<dyn StorageOverride<Block>>,
+			Arc<dyn StorageOverride<B>>,
 			Option<Telemetry>,
-      Option<BabeWorkerHandle<Block>>
+      Option<BabeWorkerHandle<B>>
     ),
-  )
->, ServiceError> 
+  ) 
+>, ServiceError>
+  where
+  B: BlockT<Hash = H256>,
+  NumberFor<B>: BlockNumberOps,
+  RA: ConstructRuntimeApi<B, FullClient<B, RA, HF>>,
+	RA: Send + Sync + 'static,
+	RA::RuntimeApi: BaseRuntimeApiCollection<B> + EthCompatRuntimeApiCollection<B>,
+	HF: HostFunctionsT + 'static,
 {
   let eth_config = &cli.run.eth;
   let telemetry = config
@@ -113,7 +157,7 @@ pub fn new_partial(
 	let executor = sc_service::new_wasm_executor(&config);
 
   let (client, backend, keystore_container, task_manager) =
-    sc_service::new_full_parts::<Block, RuntimeApi, _>(&config,
+    sc_service::new_full_parts::<B, RA, _>(&config,
       telemetry.as_ref().map(|(_, telemetry)| telemetry.handle()),
 			executor,
     )?;
@@ -147,7 +191,7 @@ pub fn new_partial(
 
   let justification_import = grandpa_block_import.clone();
 
-  let storage_override = Arc::new(StorageOverrideHandler::<Block, _, _>::new(client.clone()));
+  let storage_override = Arc::new(StorageOverrideHandler::<B, _, _>::new(client.clone()));
   let frontier_backend = match eth_config.frontier_backend_type {
 	  BackendType::KeyValue => FrontierBackend::KeyValue(Arc::new(fc_db::kv::Backend::open(
 			Arc::clone(&client),
@@ -236,30 +280,45 @@ pub fn new_partial(
 
 
 /// Result of [`new_full_base`].
-pub struct NewFullBase {
+pub struct NewFullBase<B: BlockT, RA, HF> 
+where
+  RA: ConstructRuntimeApi<B, FullClient<B, RA, HF>>,
+  RA: Send + Sync + 'static,
+  RA::RuntimeApi: RuntimeApiCollection<B, AccountId, Index, Balance>,
+  HF: HostFunctionsT + 'static,
+{ 
 	/// The task manager of the node.
 	pub task_manager: TaskManager,
 	/// The client instance of the node.
-	pub client: Arc<FullClient>,
+	pub client: Arc<FullClient<B, RA, HF>>,
 	/// The networking service of the node.
 	pub network: Arc<dyn NetworkService>,
 	/// The syncing service of the node.
-	pub sync: Arc<SyncingService<Block>>,
+	pub sync: Arc<SyncingService<B>>,
 	/// The transaction pool of the node.
-	pub transaction_pool: Arc<TransactionPool>,
+	pub transaction_pool: Arc<TransactionPool<B, RA, HF>>,
 	/// The rpc handlers of the node.
 	pub rpc_handlers: RpcHandlers,
 }
 
 /// Builds a new service for a full client.
-pub async fn new_full_base<N: NetworkBackend<Block, <Block as BlockT>::Hash>>(
+pub async fn new_full_base<B, RA, HF, NB>(
   mut config: Configuration,
   cli: &Cli,
   with_startup_data: impl FnOnce(
-    &sc_consensus_babe::BabeBlockImport<Block, FullClient, FullFrontierBlockImport>,
-    &sc_consensus_babe::BabeLink<Block>,
+    &sc_consensus_babe::BabeBlockImport<B, FullClient<B, RA, HF>, FullFrontierBlockImport<B, RA, HF>>,
+    &sc_consensus_babe::BabeLink<B>,
   )
-) -> Result<NewFullBase, ServiceError>
+) -> Result<NewFullBase<B, RA, HF>, ServiceError> 
+where
+  B: BlockT<Hash = H256> + Unpin,
+  NumberFor<B>: BlockNumberOps,
+  <B as BlockT>::Header: Unpin,
+  RA: ConstructRuntimeApi<B, FullClient<B, RA, HF>>,
+  RA: Send + Sync + 'static,
+  RA::RuntimeApi: RuntimeApiCollection<B, AccountId, Index, Balance>,
+  HF: HostFunctionsT + 'static,
+  NB: sc_network::NetworkBackend<B, <B as BlockT>::Hash>,
 {
   let eth_config = &cli.run.eth;
   let manual_seal = cli.run.manual_seal;
@@ -283,12 +342,12 @@ pub async fn new_full_base<N: NetworkBackend<Block, <Block as BlockT>::Hash>>(
 	} = new_frontier_partial(&eth_config)?;
 
 	let mut net_config =
-  sc_network::config::FullNetworkConfiguration::<_, _, N>::new(&config.network);
+  sc_network::config::FullNetworkConfiguration::<_, _, NB>::new(&config.network);
 
-  let genesis_hash = client.block_hash(0).ok().flatten().expect("Genesis block exists; qed");
+  let genesis_hash = client.block_hash(Zero::zero()).ok().flatten().expect("Genesis block exists; qed");
 	let peer_store_handle = net_config.peer_store_handle();
 
-  let metrics = N::register_notification_metrics(
+  let metrics = NB::register_notification_metrics(
 		config.prometheus_config.as_ref().map(|cfg| &cfg.registry),
 	);
   let grandpa_protocol_name = sc_consensus_grandpa::protocol_standard_name(&genesis_hash, &config.chain_spec);
@@ -308,7 +367,7 @@ pub async fn new_full_base<N: NetworkBackend<Block, <Block as BlockT>::Hash>>(
 
 
 	let (grandpa_protocol_config, grandpa_notification_service) =
-  sc_consensus_grandpa::grandpa_peers_set_config::<_, N>(
+  sc_consensus_grandpa::grandpa_peers_set_config::<_, NB>(
 			grandpa_protocol_name.clone(),
 			metrics.clone(),
 			Arc::clone(&peer_store_handle),
@@ -407,7 +466,7 @@ pub async fn new_full_base<N: NetworkBackend<Block, <Block as BlockT>::Hash>>(
 	// The MappingSyncWorker sends through the channel on block import and the subscription emits a notification to the subscriber on receiving a message through this channel.
 	// This way we avoid race conditions when using native substrate block import notification stream.
 	let pubsub_notification_sinks: fc_mapping_sync::EthereumBlockNotificationSinks<
-		fc_mapping_sync::EthereumBlockNotification<Block>,
+		fc_mapping_sync::EthereumBlockNotification<B>,
 	> = Default::default();
 	let pubsub_notification_sinks = Arc::new(pubsub_notification_sinks);
 
@@ -459,7 +518,7 @@ pub async fn new_full_base<N: NetworkBackend<Block, <Block as BlockT>::Hash>>(
 				client: client.clone(),
 				pool: pool.clone(),
 				graph: pool.pool().clone(),
-				converter: Some(TransactionConverter::<Block>::default()), 
+				converter: Some(TransactionConverter::<B>::default()), 
 				is_authority,
 				enable_dev_signer,
 				network: network.clone(),
@@ -746,7 +805,7 @@ pub async fn new_full(config: Configuration, cli: &Cli)
 
   let task_manager = match config.network.network_backend {
 		sc_network::config::NetworkBackendType::Libp2p => {
-			let task_manager = new_full_base::<sc_network::NetworkWorker<_, _>>(
+			let task_manager = new_full_base::<Block, RuntimeApi, HostFunctions, sc_network::NetworkWorker<_, _>>(
 				config,
 				cli,
 				|_, _| (),
@@ -755,7 +814,7 @@ pub async fn new_full(config: Configuration, cli: &Cli)
       task_manager
 		},
 		sc_network::config::NetworkBackendType::Litep2p => {
-			let task_manager = new_full_base::<sc_network::Litep2pNetworkBackend>(
+			let task_manager = new_full_base::<Block, RuntimeApi, HostFunctions, sc_network::Litep2pNetworkBackend>(
 				config,
 				cli,
 				|_, _| (),
@@ -778,19 +837,26 @@ pub async fn new_full(config: Configuration, cli: &Cli)
   Ok(task_manager)
 }
 
-pub fn new_chain_ops(
+pub fn new_chain_ops<B, RA, HF>(
 	config: &mut Configuration,
   cli: &Cli,
 ) -> Result<
 	(
-		Arc<FullClient>,
-		Arc<FullBackend>,
-		BasicQueue<Block>,
+		Arc<FullClient<B, RA, HF>>,
+		Arc<FullBackend<B>>,
+		BasicQueue<B>,
 		TaskManager,
-		FullFrontierBackend,
+		FullFrontierBackend<B, RA, HF>,
 	),
 	ServiceError,
-> {
+> where
+  B: BlockT<Hash = H256>,
+  NumberFor<B>: BlockNumberOps,
+  RA: ConstructRuntimeApi<B, FullClient<B, RA, HF>>,
+  RA: Send + Sync + 'static,
+  RA::RuntimeApi: BaseRuntimeApiCollection<B> + EthCompatRuntimeApiCollection<B>,
+  HF: HostFunctionsT + 'static,
+{
 	config.keystore = sc_service::config::KeystoreConfig::InMemory;
 	let PartialComponents {
 		client,
@@ -804,4 +870,32 @@ pub fn new_chain_ops(
     cli,
 	)?;
 	Ok((client, backend, import_queue, task_manager, other.1.1))
+}
+
+/// A set of APIs that template runtime must implement.
+pub trait RuntimeApiCollection<
+	Block: BlockT,
+	AccountId: Codec,
+	Nonce: Codec,
+	Balance: Codec + MaybeDisplay,
+>:
+	BaseRuntimeApiCollection<Block>
+	+ EthCompatRuntimeApiCollection<Block>
+	+ frame_system_rpc_runtime_api::AccountNonceApi<Block, AccountId, Nonce>
+	+ pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi<Block, Balance>
+{
+}
+
+impl<Block, AccountId, Nonce, Balance, Api>
+	RuntimeApiCollection<Block, AccountId, Nonce, Balance> for Api
+where
+	Block: BlockT,
+	AccountId: Codec,
+	Nonce: Codec,
+	Balance: Codec + MaybeDisplay,
+	Api: BaseRuntimeApiCollection<Block>
+		+ EthCompatRuntimeApiCollection<Block>
+		+ frame_system_rpc_runtime_api::AccountNonceApi<Block, AccountId, Nonce>
+		+ pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi<Block, Balance>,
+{
 }

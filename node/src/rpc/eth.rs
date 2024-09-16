@@ -1,6 +1,4 @@
 use std::{collections::BTreeMap, sync::Arc};
-
-use clover_primitives::Block;
 use jsonrpsee::RpcModule;
 // Substrate
 use sc_client_api::{
@@ -8,6 +6,7 @@ use sc_client_api::{
 	client::BlockchainEvents, 
 	AuxStore, UsageProvider,
 };
+use sc_consensus_babe::BabeApi;
 use sc_network::service::traits::NetworkService;
 use sc_network_sync::SyncingService;
 use sc_rpc::SubscriptionTaskExecutor;
@@ -23,16 +22,16 @@ pub use fc_rpc::{EthBlockDataCacheTask, EthConfig};
 pub use fc_rpc_core::types::{FeeHistoryCache, FeeHistoryCacheLimit, FilterPool};
 use fc_storage::StorageOverride;
 use fp_rpc::{ConvertTransaction, ConvertTransactionRuntimeApi, EthereumRuntimeRPCApi};
-use crate::service::{FullBackend, FullClient, TransactionPool};
+use crate::service::{FullBackend, FullClient, FullFrontierBackend};
 
 /// Extra dependencies for Ethereum compatibility.
-pub struct EthDeps<CT, CIDP> {
+pub struct EthDeps<B: BlockT, C, P, A: ChainApi, CT, CIDP> {
 	/// The client instance to use.
-	pub client: Arc<FullClient>,
+	pub client: Arc<C>,
 	/// Transaction pool instance.
-	pub pool: Arc<TransactionPool>,
+	pub pool: Arc<P>,
 	/// Graph pool instance.
-	pub graph: Arc<Pool<FullChainApi<FullClient, Block>>>,
+	pub graph: Arc<Pool<A>>,
 	/// Ethereum transaction converter.
 	pub converter: Option<CT>,
 	/// The Node authority flag
@@ -42,13 +41,13 @@ pub struct EthDeps<CT, CIDP> {
 	/// Network service
 	pub network: Arc<dyn NetworkService>,
 	/// Chain syncing service
-	pub sync: Arc<SyncingService<Block>>,
+	pub sync: Arc<SyncingService<B>>,
 	/// Frontier Backend.
-	pub frontier_backend: Arc<dyn fc_api::Backend<Block>>,
+	pub frontier_backend: Arc<dyn fc_api::Backend<B>>,
 	/// Ethereum data access overrides.
-	pub storage_override: Arc<dyn StorageOverride<Block>>,
+	pub storage_override: Arc<dyn StorageOverride<B>>,
 	/// Cache for Ethereum block data.
-	pub block_data_cache: Arc<EthBlockDataCacheTask<Block>>,
+	pub block_data_cache: Arc<EthBlockDataCacheTask<B>>,
 	/// EthFilterApi pool.
 	pub filter_pool: Option<FilterPool>,
 	/// Maximum number of logs in a query.
@@ -67,20 +66,31 @@ pub struct EthDeps<CT, CIDP> {
 }
 
 /// Instantiate Ethereum-compatible RPC extensions.
-pub fn create_eth<CT, CIDP, EC>(
+pub fn create_eth<B, C, BE, P, A, CT, CIDP, EC>(
 	mut io: RpcModule<()>,
-	deps: EthDeps<CT, CIDP>,
+	deps: EthDeps<B, C, P, A, CT, CIDP>,
 	subscription_task_executor: SubscriptionTaskExecutor,
 	pubsub_notification_sinks: Arc<
 		fc_mapping_sync::EthereumBlockNotificationSinks<
-			fc_mapping_sync::EthereumBlockNotification<Block>,
+			fc_mapping_sync::EthereumBlockNotification<B>,
 		>,
 	>,
 ) -> Result<RpcModule<()>, Box<dyn std::error::Error + Send + Sync>>
 where
-	CT: ConvertTransaction<<Block as BlockT>::Extrinsic> + Send + Sync + 'static,
-	CIDP: CreateInherentDataProviders<Block, ()> + Send + 'static,
-	EC: EthConfig<Block, FullClient>,
+	B: BlockT,
+	C: CallApiAt<B> + ProvideRuntimeApi<B>,
+	C::Api: BabeApi<B>
+		+ BlockBuilderApi<B>
+		+ ConvertTransactionRuntimeApi<B>
+		+ EthereumRuntimeRPCApi<B>,
+	C: HeaderBackend<B> + HeaderMetadata<B, Error = BlockChainError>,
+	C: BlockchainEvents<B> + AuxStore + UsageProvider<B> + StorageProvider<B, BE> + 'static,
+	BE: Backend<B> + 'static,
+	P: polkadot_sdk::sc_transaction_pool_api::TransactionPool<Block = B> + 'static,
+	A: ChainApi<Block = B> + 'static,
+	CT: ConvertTransaction<<B as BlockT>::Extrinsic> + Send + Sync + 'static,
+	CIDP: CreateInherentDataProviders<B, ()> + Send + 'static,
+	EC: EthConfig<B, C>,
 {
 	use fc_rpc::{Debug, DebugApiServer, Eth, EthApiServer, EthDevSigner,
 		EthFilter, EthFilterApiServer, EthPubSub, EthPubSubApiServer, EthSigner, Net, NetApiServer,
@@ -116,7 +126,7 @@ where
 	}
 
 	io.merge(
-		Eth::<Block, FullClient, TransactionPool, CT, FullBackend, FullChainApi<FullClient, Block>, CIDP, EC>::new(
+		Eth::<B, C, P, CT, BE, A, CIDP, EC>::new(
 			client.clone(),
 			pool.clone(),
 			graph.clone(),
