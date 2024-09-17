@@ -7,12 +7,12 @@ use polkadot_sdk::sc_offchain;
 use sc_client_api::{ExecutorProvider, BlockchainEvents};
 use fc_rpc_core::types::FilterPool;
 use fc_rpc::EthTask;
-use clover_runtime::{self, RuntimeApi, TransactionConverter};
+use clover_runtime::{self, RuntimeApi, TransactionConverter, opaque::Block};
 use sc_consensus::BasicQueue;
 use sc_consensus_babe::{BabeWorkerHandle, SlotProportion};
 use sc_consensus_grandpa::BlockNumberOps;
 use sc_executor::{HostFunctions as HostFunctionsT, WasmExecutor};
-use sc_network::{service::traits::NetworkService, Event, NetworkBackend};
+use sc_network::{service::traits::NetworkService, Event};
 use sc_network_sync::SyncingService;
 use sc_service::{error::Error as ServiceError, BasePath, Configuration, PartialComponents, RpcHandlers, TaskManager};
 use sp_api::ConstructRuntimeApi;
@@ -28,7 +28,7 @@ use futures::channel::mpsc::Receiver;
 use futures::StreamExt;
 use futures::prelude::*;
 use sc_consensus_manual_seal::{EngineCommand, ManualSealParams};
-use clover_primitives::{Block, Hash, AccountId, Index, Balance};
+use clover_primitives::{Hash, AccountId, Index, Balance};
 pub use crate::eth::{db_config_dir, EthConfiguration};
 use crate::
 	eth::{
@@ -55,8 +55,6 @@ pub type FullFrontierBackend<B, RA, HF> = fc_db::Backend<B, FullClient<B, RA, HF
 /// HostFunctions.
 pub type RuntimeExecutor = sc_executor::WasmExecutor<HostFunctions>;
 
-/// The full client type definition.
-// pub type FullClient = sc_service::TFullClient<Block, RuntimeApi, RuntimeExecutor>;
 /// Full backend.
 pub type FullBackend<B> = sc_service::TFullBackend<B>;
 
@@ -278,29 +276,6 @@ pub fn new_partial<B, RA, HF>(
   })
 }
 
-
-/// Result of [`new_full_base`].
-pub struct NewFullBase<B: BlockT, RA, HF> 
-where
-  RA: ConstructRuntimeApi<B, FullClient<B, RA, HF>>,
-  RA: Send + Sync + 'static,
-  RA::RuntimeApi: RuntimeApiCollection<B, AccountId, Index, Balance>,
-  HF: HostFunctionsT + 'static,
-{ 
-	/// The task manager of the node.
-	pub task_manager: TaskManager,
-	/// The client instance of the node.
-	pub client: Arc<FullClient<B, RA, HF>>,
-	/// The networking service of the node.
-	pub network: Arc<dyn NetworkService>,
-	/// The syncing service of the node.
-	pub sync: Arc<SyncingService<B>>,
-	/// The transaction pool of the node.
-	pub transaction_pool: Arc<TransactionPool<B, RA, HF>>,
-	/// The rpc handlers of the node.
-	pub rpc_handlers: RpcHandlers,
-}
-
 /// Builds a new service for a full client.
 pub async fn new_full_base<B, RA, HF, NB>(
   mut config: Configuration,
@@ -309,7 +284,7 @@ pub async fn new_full_base<B, RA, HF, NB>(
     &sc_consensus_babe::BabeBlockImport<B, FullClient<B, RA, HF>, FullFrontierBlockImport<B, RA, HF>>,
     &sc_consensus_babe::BabeLink<B>,
   )
-) -> Result<NewFullBase<B, RA, HF>, ServiceError> 
+) -> Result<TaskManager, ServiceError> 
 where
   B: BlockT<Hash = H256> + Unpin,
   NumberFor<B>: BlockNumberOps,
@@ -323,9 +298,7 @@ where
   let eth_config = &cli.run.eth;
   let manual_seal = cli.run.manual_seal;
 
-  let is_offchain_indexing_enabled = config.offchain_worker.indexing_enabled;
 	let role = config.role.clone();
-	let force_authoring = config.force_authoring;
 	let auth_disc_publish_non_global_ips = config.network.allow_non_globals_in_dht;
 	let auth_disc_public_addresses = config.network.public_addresses.clone();
 
@@ -788,14 +761,7 @@ where
   }
 
   network_starter.start_network();
-  Ok(NewFullBase {
-    task_manager,
-    client,
-    network,
-    sync: sync_service,
-    transaction_pool,
-    rpc_handlers: _rpc_handlers,
-  })
+  Ok(task_manager)
 }
 
 /// Builds a new service for a full client.
@@ -805,24 +771,22 @@ pub async fn new_full(config: Configuration, cli: &Cli)
 
   let task_manager = match config.network.network_backend {
 		sc_network::config::NetworkBackendType::Libp2p => {
-			let task_manager = new_full_base::<Block, RuntimeApi, HostFunctions, sc_network::NetworkWorker<_, _>>(
+			new_full_base::<Block, RuntimeApi, HostFunctions, sc_network::NetworkWorker<_, _>>(
 				config,
 				cli,
 				|_, _| (),
 			)
-			.await.map(|NewFullBase { task_manager, .. }| task_manager)?;
-      task_manager
+			.await?
 		},
 		sc_network::config::NetworkBackendType::Litep2p => {
-			let task_manager = new_full_base::<Block, RuntimeApi, HostFunctions, sc_network::Litep2pNetworkBackend>(
+			new_full_base::<Block, RuntimeApi, HostFunctions, sc_network::Litep2pNetworkBackend>(
 				config,
 				cli,
 				|_, _| (),
 			)
-			.await.map(|NewFullBase { task_manager, .. }| task_manager)?;
-			task_manager
+			.await?
 		},
-	};
+	}; 
 
   // TODO: uncomment this when storage monitor is ready
 	// if let Some(database_path) = database_path {

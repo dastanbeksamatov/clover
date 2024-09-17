@@ -171,7 +171,7 @@ sc-consensus-manual-seal = { git = "https://github.com/paritytech/polkadot-sdk.g
 sc-consensus-epochs = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
 sc-executor = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
 sc-consensus-grandpa = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
-sc-consensus-grandpa-rpc = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
+sc-consensus-grandpa-rpc = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407", default-features = false }
 sc-informant = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
 sc-keystore = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
 sc-mixnet = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
