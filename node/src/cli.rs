@@ -52,10 +52,6 @@ pub struct RunCmd {
     #[clap(flatten)]
     pub base: sc_cli::RunCmd,
 
-    /// Maximum number of logs in a query.
-    #[arg(long, default_value = "10000")]
-    pub max_past_logs: u32,
-
     #[arg(long)]
     pub manual_seal: bool,
 
