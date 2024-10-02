@@ -47,7 +47,7 @@ pub enum Subcommand {
 
 #[allow(missing_docs)]
 #[derive(Debug, clap::Parser)]
-pub struct RunCmd {
+pub struct CloverRunCmd {
     #[allow(missing_docs)]
     #[clap(flatten)]
     pub base: sc_cli::RunCmd,
@@ -65,7 +65,7 @@ pub struct Cli {
     pub subcommand: Option<Subcommand>,
 
     #[clap(flatten)]
-    pub run: RunCmd,
+    pub run: CloverRunCmd,
 
     #[allow(missing_docs)]
     #[clap(flatten)]

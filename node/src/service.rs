@@ -11,7 +11,7 @@ use clover_runtime::{self, RuntimeApi, TransactionConverter, opaque::Block};
 use sc_consensus::BasicQueue;
 use sc_consensus_babe::{BabeWorkerHandle, SlotProportion};
 use sc_consensus_grandpa::BlockNumberOps;
-use sc_executor::{HostFunctions as HostFunctionsT, WasmExecutor};
+use sc_executor::{HostFunctions as HostFunctionsT, WasmExecutor, DEFAULT_HEAP_ALLOC_STRATEGY};
 use sc_network::{service::traits::NetworkService, Event};
 use sc_network_sync::SyncingService;
 use sc_service::{error::Error as ServiceError, BasePath, Configuration, PartialComponents, RpcHandlers, TaskManager};
@@ -152,7 +152,18 @@ pub fn new_partial<B, RA, HF>(
     })
     .transpose()?;
 
-	let executor = sc_service::new_wasm_executor(&config);
+	// let executor = sc_service::new_wasm_executor(&config);
+  let executor = {
+    let strategy = config.default_heap_pages.map_or(DEFAULT_HEAP_ALLOC_STRATEGY, |p| sc_executor::HeapAllocStrategy::Static { extra_pages: p as _ });
+    WasmExecutor::<HF>::builder()
+      .with_execution_method(config.wasm_method)
+      .with_onchain_heap_alloc_strategy(strategy)
+      .with_offchain_heap_alloc_strategy(strategy)
+      .with_max_runtime_instances(config.max_runtime_instances)
+      .with_runtime_cache_size(config.runtime_cache_size)
+      .with_allow_missing_host_functions(true)
+      .build()
+  };
 
   let (client, backend, keystore_container, task_manager) =
     sc_service::new_full_parts::<B, RA, _>(&config,
