@@ -464,6 +464,8 @@ pub fn testnet_genesis(
     const STASH: Balance = 100 * DOLLARS;
     const AUTHOR_BALANCE: Balance = 200 * DOLLARS;
 
+    let num_endowed_accounts = endowed_accounts.len();
+
     serde_json::json!({
       "balances": {
         "balances": endowed_accounts.iter().chain(initial_authorities.iter().map(|a| &a.0)).map(|k| (k, ENDOWMENT)).collect::<Vec<_>>(),
@@ -476,7 +478,7 @@ pub fn testnet_genesis(
             x.4.clone(),
             x.5.clone(),
           )))
-                  .collect::<Vec<_>>(),
+          .collect::<Vec<_>>(),
       },
       "staking": {
         "validatorCount": initial_authorities.len() as u32,
@@ -490,9 +492,17 @@ pub fn testnet_genesis(
       "babe": {
         "epochConfig": Some(clover_runtime::BABE_GENESIS_EPOCH_CONFIG),
       },
-          "sudo": { "key": Some(root_key.clone()) },
+      "sudo": { "key": Some(root_key.clone()) },
       "evm": {
         "accounts": Some(endowed_eth_accounts),
-      }
+      },
+      "electionsPhragmen": {
+        "members": endowed_accounts
+          .iter()
+          .take((num_endowed_accounts + 1) / 2)
+          .cloned()
+          .map(|member| (member, STASH))
+          .collect::<Vec<_>>(),
+      },
     })
 }
