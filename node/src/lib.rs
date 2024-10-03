@@ -1,7 +1,8 @@
+mod benchmarking;
 pub mod chain_spec;
-pub mod service;
-pub mod rpc; 
-pub mod eth;
-#[cfg(feature = "cli")] 
+#[cfg(feature = "cli")]
 mod cli;
 mod command;
+pub mod eth;
+pub mod rpc;
+pub mod service;

@@ -134,6 +134,7 @@ sp-core = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "st
 sp-externalities = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407", default-features = false }
 sp-consensus-grandpa = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407", default-features = false }
 sp-genesis-builder = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407", default-features = false }
+sp-keyring = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407", default-features = false }
 sp-inherents = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407", default-features = false }
 sp-io = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407", default-features = false }
 sp-keystore = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407", default-features = false }
@@ -145,6 +146,7 @@ sp-sandbox = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = 
 sp-session = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407", default-features = false }
 sp-staking = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407", default-features = false }
 sp-std = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407", default-features = false }
+sp-statement-store = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407", default-features = false }
 sp-storage = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407", default-features = false }
 sp-timestamp = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407", default-features = false }
 sp-transaction-storage-proof = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407", default-features = false }
@@ -185,5 +187,6 @@ sc-service = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = 
 sc-sync-state-rpc = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
 sc-telemetry = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
 sc-transaction-pool = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
+sc-transaction-pool-api = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
 staging-node-inspect = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407", default-features = false }
 polkadot-sdk = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "stable2407" }
