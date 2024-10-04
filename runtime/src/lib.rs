@@ -162,13 +162,13 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     impl_name: create_runtime_str!("clover"),
     state_version: 1,
     authoring_version: 1,
-    spec_version: 18,
+    spec_version: 24,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
 };
 
-pub const MILLISECS_PER_BLOCK: u64 = 6000;
+pub const MILLISECS_PER_BLOCK: u64 = 3000;
 
 pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK;
 
@@ -1397,11 +1397,11 @@ construct_runtime!(
   pub struct Runtime {
     System: frame_system::{Pallet, Call, Config<T>, Storage, Event<T>},
     RandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip::{Pallet, Storage},
-    Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
 
     Authorship: pallet_authorship::{Pallet, Storage},
     Babe: pallet_babe::{Pallet, Call, Storage, Config<T>, ValidateUnsigned},
     Grandpa: pallet_grandpa::{Pallet, Call, Storage, Config<T>, Event},
+    Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
 
     Indices: pallet_indices::{Pallet, Call, Storage, Config<T>, Event<T>},
     Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
@@ -1568,13 +1568,14 @@ impl_runtime_apis! {
 
   impl sp_consensus_babe::BabeApi<Block> for Runtime {
     fn configuration() -> sp_consensus_babe::BabeConfiguration {
+    let epoch_config = Babe::epoch_config().unwrap_or(BABE_GENESIS_EPOCH_CONFIG);
       sp_consensus_babe::BabeConfiguration {
         slot_duration: Babe::slot_duration(),
         epoch_length: EpochDuration::get(),
-        c: PRIMARY_PROBABILITY,
+        c: epoch_config.c,
         authorities: Babe::authorities().to_vec(),
         randomness: Babe::randomness(),
-        allowed_slots: sp_consensus_babe::AllowedSlots::PrimaryAndSecondaryPlainSlots,
+        allowed_slots: epoch_config.allowed_slots,
       }
     }
 
