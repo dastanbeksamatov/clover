@@ -120,6 +120,8 @@ impl_opaque_keys! {
   }
 }
 
+
+#[sp_version::runtime_version]
 pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: create_runtime_str!("clover"),
     impl_name: create_runtime_str!("clover"),

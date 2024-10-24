@@ -21,8 +21,7 @@ clover-runtime = { workspace = true }
 clover-rpc = { workspace = true }
 futures = { workspace = true }
 
-jsonrpc-core = { workspace = true }
-jsonrpc-pubsub = { workspace = true }
+jsonrpsee = { workspace = true }
 structopt = { workspace = true, optional = true }
 serde_json = { workspace = true }
 
@@ -48,6 +47,7 @@ sc-keystore = { workspace = true }
 sc-network = { workspace = true }
 sc-rpc = { workspace = true }
 sc-rpc-api = { workspace = true }
+sc-transaction-pool-api = { workspace = true }
 sc-sync-state-rpc = { workspace = true }
 sc-service = { workspace = true }
 sc-transaction-pool = { workspace = true }
@@ -63,6 +63,7 @@ sp-inherents = { workspace = true }
 sp-keystore = { workspace = true }
 sp-runtime = { workspace = true }
 sp-transaction-pool = { workspace = true }
+sp-version = { workspace = true }
 substrate-frame-rpc-system = { workspace = true }
 hex-literal = { workspace = true }
 sc-telemetry = { workspace = true }
