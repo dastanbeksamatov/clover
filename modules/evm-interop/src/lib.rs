@@ -31,20 +31,20 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
         /// Mapping from address to account id.
         type AddressMapping: AddressMapping<Self::AccountId>;
         type Currency: Currency<Self::AccountId>;
     }
 
     #[pallet::pallet]
-    pub struct Pallet<T>(sp_std::marker::PhantomData<T>);
+    pub struct Pallet<T>(_);
 
     #[pallet::hooks]
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
 
     #[pallet::event]
-    #[pallet::metadata(T::AccountId = "AccountId")]
+    #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {}
 
     #[pallet::call]
@@ -54,15 +54,16 @@ pub mod pallet {
         /// Pay attention while sending fund to a smart contract address
         /// It will not trigger the `receive` callback in the smart contract.
         /// Be careful!
+        #[pallet::call_index(0)]
         #[pallet::weight(T::DbWeight::get().reads_writes(2, 2))]
         #[frame_support::transactional]
-        pub(super) fn transfer_to_evm(
+        pub fn transfer_to_evm(
             origin: OriginFor<T>,
             to: EvmAddress,
             amount: BalanceOf<T>,
         ) -> DispatchResultWithPostInfo {
             let from = ensure_signed(origin)?;
-
+ 
             let account = T::AddressMapping::into_account_id(to);
 
             T::Currency::transfer(&from, &account, amount, ExistenceRequirement::AllowDeath)?;
