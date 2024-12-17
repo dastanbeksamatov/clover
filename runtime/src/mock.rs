@@ -1,35 +1,20 @@
 #![cfg(test)]
 
+use frame_support::derive_impl;
+
 use super::*;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct TestRuntime;
 
+#[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
 impl frame_system::Config for TestRuntime {
-    type BaseCallFilter = ();
+    type Block = Block;
     type AccountId = AccountId;
-    type RuntimeCall = RuntimeCall;
     type Lookup = Indices;
     type Nonce = Index;
     type Hash = Hash;
-    type Hashing = BlakeTwo256;
-    type Header = generic::Header<BlockNumber, BlakeTwo256>;
-    type RuntimeEvent = RuntimeEvent;
-    type RuntimeOrigin = RuntimeOrigin;
-    type BlockHashCount = BlockHashCount;
-    type MaximumBlockWeight = MaximumBlockWeight;
-    type DbWeight = RocksDbWeight;
-    type BlockExecutionWeight = BlockExecutionWeight;
-    type ExtrinsicBaseWeight = ExtrinsicBaseWeight;
-    type MaximumExtrinsicWeight = MaximumExtrinsicWeight;
-    type MaximumBlockLength = MaximumBlockLength;
-    type AvailableBlockRatio = AvailableBlockRatio;
-    type Version = Version;
-    type PalletInfo = ();
-    type OnNewAccount = ();
-    type OnKilledAccount = ();
     type AccountData = pallet_balances::AccountData<Balance>;
-    type SystemWeightInfo = ();
 }
 
 pub const ALICE: [u8; 32] = [0u8; 32];
@@ -57,7 +42,7 @@ impl ExtBuilder {
 
     pub fn build(self) -> sp_io::TestExternalities {
         let mut t = frame_system::GenesisConfig::default()
-            .build_storage::<Runtime>()
+            .build_storage()
             .unwrap();
 
         pallet_balances::GenesisConfig::<Runtime> {
@@ -73,22 +58,14 @@ impl ExtBuilder {
         .assimilate_storage(&mut t)
         .unwrap();
 
-        orml_tokens::GenesisConfig::<Runtime> {
-            endowed_accounts: self
-                .endowed_accounts
-                .into_iter()
-                .filter(|(_, currency_id, _)| *currency_id != CLV)
-                .collect::<Vec<_>>(),
-        }
-        .assimilate_storage(&mut t)
-        .unwrap();
-
         pallet_membership::GenesisConfig::<Runtime, pallet_membership::Instance1> {
             members: vec![
                 AccountId::from(ALICE),
                 AccountId::from(BOB),
                 AccountId::from(DAVE),
-            ],
+            ]
+            .try_into()
+            .unwrap(),
             phantom: Default::default(),
         }
         .assimilate_storage(&mut t)

@@ -16,21 +16,21 @@ fn test_balance() {
         .build()
         .execute_with(|| {
             assert_eq!(
-                <Currencies as MultiCurrency<_>>::free_balance(CLV, &AccountId::from(ALICE)),
+                <Currencies as Currency<_>>::free_balance(CLV, &AccountId::from(ALICE)),
                 500
             );
             assert_eq!(
-                <Currencies as MultiCurrency<_>>::free_balance(CUSDT, &AccountId::from(BOB)),
+                <Currencies as Currency<_>>::free_balance(CUSDT, &AccountId::from(BOB)),
                 1000
             );
 
-            let _ = <Currencies as MultiCurrencyExtended<_>>::update_balance(
+            let _ = <Currencies as frame_support::traits::fungible::Mutate<_>>::update_balance(
                 CLV,
                 &AccountId::from(ALICE),
                 1000,
             );
             assert_eq!(
-                <Currencies as MultiCurrency<_>>::free_balance(CLV, &AccountId::from(ALICE)),
+                <Currencies as Currency<_>>::free_balance(CLV, &AccountId::from(ALICE)),
                 1500
             );
         });
